@@ -1,5 +1,5 @@
-Unknown	30	3356	30
-FTP_CONTROL	36	2569	12
+Unknown	29	3296	29
+FTP_CONTROL	2	184	2
 DNS	301	26612	159
 NetBIOS	102	9445	25
 SMBv1	7	1620	3
@@ -7,11 +7,12 @@ DHCP	2	932	1
 SMBv23	3	186	1
 RTP	9	1926	5
 SIP	85	39540	15
+WEBSOCKET	35	2445	11
 
 	1	UDP 212.242.33.35:5060 <-> 192.168.1.2:5060 [proto: 100/SIP][cat: VoIP/10][23 pkts/11772 bytes <-> 37 pkts/14743 bytes][Goodput ratio: 91/89][1521.43 sec][bytes ratio: -0.112 (Mixed)][IAT c2s/s2c min/avg/max/stddev: 19/227 32597/38366 167478/304738 41340/57147][Pkt Len c2s/s2c min/avg/max/stddev: 344/47 512/398 711/1118 86/358][PLAIN TEXT (SIP/2.0 401 Unauthorized)]
 	2	UDP 192.168.1.2:5060 <-> 200.68.120.81:5060 [proto: 100/SIP][cat: VoIP/10][9 pkts/4647 bytes <-> 3 pkts/1944 bytes][Goodput ratio: 92/93][66.58 sec][bytes ratio: 0.410 (Upload)][IAT c2s/s2c min/avg/max/stddev: 507/34556 8170/34556 32608/34556 10578/0][Pkt Len c2s/s2c min/avg/max/stddev: 417/637 516/648 864/656 186/8][PLAIN TEXT (INVITEKsip)]
 	3	UDP 192.168.1.2:137 -> 192.168.1.255:137 [proto: 10/NetBIOS][cat: System/18][71 pkts/6532 bytes -> 0 pkts/0 bytes][Goodput ratio: 54/0][1527.12 sec][Host: eci_domain][bytes ratio: 1.000 (Upload)][IAT c2s/s2c min/avg/max/stddev: 741/0 20522/0 93225/0 24163/0][Pkt Len c2s/s2c min/avg/max/stddev: 92/0 92/0 92/0 0/0][PLAIN TEXT ( EFEDEJ)]
-	4	TCP 192.168.1.2:2720 <-> 147.234.1.253:21 [proto: 1/FTP_CONTROL][cat: Download-FileTransfer-FileSharing/7][11 pkts/624 bytes <-> 14 pkts/1080 bytes][Goodput ratio: 4/27][0.32 sec][bytes ratio: -0.268 (Download)][IAT c2s/s2c min/avg/max/stddev: 0/0 24/7 115/18 38/8][Pkt Len c2s/s2c min/avg/max/stddev: 54/60 57/77 70/113 5/19][PLAIN TEXT (220 ProFTPD Server In ECI Telec)]
+	4	TCP 192.168.1.2:2720 <-> 147.234.1.253:21 [proto: 251/WEBSOCKET][cat: Web/5][11 pkts/624 bytes <-> 14 pkts/1080 bytes][Goodput ratio: 4/27][0.32 sec][bytes ratio: -0.268 (Download)][IAT c2s/s2c min/avg/max/stddev: 0/0 24/7 115/18 38/8][Pkt Len c2s/s2c min/avg/max/stddev: 54/60 57/77 70/113 5/19][PLAIN TEXT (220 ProFTPD Server In ECI Telec)]
 	5	UDP 192.168.1.2:5060 -> 212.242.33.35:17860 [proto: 100/SIP][cat: VoIP/10][1 pkts/1118 bytes -> 0 pkts/0 bytes][Goodput ratio: 96/0][< 1 sec][PLAIN TEXT (INVITE six)]
 	6	UDP 192.168.1.2:30000 -> 212.242.33.36:40392 [proto: 87/RTP][cat: Media/1][5 pkts/1070 bytes -> 0 pkts/0 bytes][Goodput ratio: 80/0][0.05 sec][PLAIN TEXT (goxcffj)]
 	7	UDP 192.168.1.2:68 <-> 192.168.1.1:67 [proto: 18/DHCP][cat: Network/14][1 pkts/342 bytes <-> 1 pkts/590 bytes][Goodput ratio: 87/93][0.00 sec][Host: d002465][DHCP Fingerprint: 1,15,3,6,44,46,47,31,33,43][PLAIN TEXT (002465Q)]
@@ -111,7 +112,7 @@ SIP	85	39540	15
 	101	UDP 192.168.1.3:53 -> 192.168.1.2:2712 [proto: 5/DNS][cat: Network/14][1 pkts/144 bytes -> 0 pkts/0 bytes][Goodput ratio: 70/0][< 1 sec][Host: sip.cybercity.dk][212.242.33.35][PLAIN TEXT (cybercity)]
 	102	TCP 147.234.1.253:21 -> 192.169.1.2:2720 [proto: 1/FTP_CONTROL][cat: Download-FileTransfer-FileSharing/7][1 pkts/130 bytes -> 0 pkts/0 bytes][Goodput ratio: 58/0][< 1 sec][PLAIN TEXT (331 Anonymous login ok)]
 	103	TCP 192.168.1.2:2718 -> 147.137.21.94:139 [proto: 10/NetBIOS][cat: System/18][2 pkts/124 bytes -> 0 pkts/0 bytes][Goodput ratio: 0/0][2.92 sec]
-	104	TCP 147.234.1.253:21 -> 192.168.1.2:2732 [proto: 1/FTP_CONTROL][cat: Download-FileTransfer-FileSharing/7][1 pkts/113 bytes -> 0 pkts/0 bytes][Goodput ratio: 52/0][< 1 sec][PLAIN TEXT ( Files larger then 250MB will b)]
+	104	TCP 147.234.1.253:21 -> 192.168.1.2:2732 [proto: 251/WEBSOCKET][cat: Web/5][1 pkts/113 bytes -> 0 pkts/0 bytes][Goodput ratio: 52/0][< 1 sec][PLAIN TEXT ( Files larger then 250MB will b)]
 	105	UDP 192.168.1.1:53 -> 192.168.1.2:2572 [proto: 5/DNS][cat: Network/14][1 pkts/105 bytes -> 0 pkts/0 bytes][Goodput ratio: 59/0][< 1 sec][::]
 	106	UDP 192.168.1.1:53 -> 192.168.1.2:2723 [proto: 5/DNS][cat: Network/14][1 pkts/105 bytes -> 0 pkts/0 bytes][Goodput ratio: 59/0][< 1 sec][Host: 1.0.0.127.in-adds.arpa][::]
 	107	UDP 192.168.1.1:53 -> 192.168.1.2:2745 [proto: 5/DNS][cat: Network/14][1 pkts/105 bytes -> 0 pkts/0 bytes][Goodput ratio: 59/0][< 1 sec][Host: 1.0.0.127.in-addr.arpa][::]
@@ -128,7 +129,7 @@ SIP	85	39540	15
 	118	UDP 192.168.130.1:53 -> 192.168.1.2:2741 [proto: 5/DNS][cat: Network/14][1 pkts/105 bytes -> 0 pkts/0 bytes][Goodput ratio: 59/0][< 1 sec][Host: 1.0.0.127.in-addr.arpa][::]
 	119	UDP 192.168.233.1:53 -> 192.168.1.2:2811 [proto: 5/DNS][cat: Network/14][1 pkts/105 bytes -> 0 pkts/0 bytes][Goodput ratio: 59/0][< 1 sec][Host: 1.0.0.127.in-addr.arpa][::]
 	120	UDP 253.168.1.1:53 -> 192.168.1.2:2735 [proto: 5/DNS][cat: Network/14][1 pkts/105 bytes -> 0 pkts/0 bytes][Goodput ratio: 59/0][< 1 sec][Host: 1.0.0.127.in-addr.arpa][::]
-	121	TCP 147.234.1.253:21 -> 192.168.65.2:2720 [proto: 1/FTP_CONTROL][cat: Download-FileTransfer-FileSharing/7][1 pkts/95 bytes -> 0 pkts/0 bytes][Goodput ratio: 43/0][< 1 sec][PLAIN TEXT (230 Guest access granted for an)]
+	121	TCP 147.234.1.253:21 -> 192.168.65.2:2720 [proto: 251/WEBSOCKET][cat: Web/5][1 pkts/95 bytes -> 0 pkts/0 bytes][Goodput ratio: 43/0][< 1 sec][PLAIN TEXT (230 Guest access granted for an)]
 	122	UDP 62.168.1.2:137 -> 192.168.1.255:137 [proto: 10/NetBIOS][cat: System/18][1 pkts/92 bytes -> 0 pkts/0 bytes][Goodput ratio: 54/0][< 1 sec][Host: eci_domain][PLAIN TEXT ( EFEDEJ)]
 	123	UDP 115.0.1.41:137 -> 192.168.1.255:137 [proto: 10/NetBIOS][cat: System/18][1 pkts/92 bytes -> 0 pkts/0 bytes][Goodput ratio: 54/0][< 1 sec][Host: workgroup][PLAIN TEXT ( FHEPFCELEHFCEPFFFACACACACACACA)]
 	124	UDP 192.136.1.2:137 -> 192.168.1.255:137 [proto: 10/NetBIOS][cat: System/18][1 pkts/92 bytes -> 0 pkts/0 bytes][Goodput ratio: 54/0][< 1 sec][Host: 5ci_dombin][PLAIN TEXT ( DFEDEJ)]
@@ -215,20 +216,21 @@ SIP	85	39540	15
 	205	UDP 192.168.33.2:2782 -> 192.168.1.1:53 [proto: 5/DNS][cat: Network/14][1 pkts/82 bytes -> 0 pkts/0 bytes][Goodput ratio: 48/0][< 1 sec][::]
 	206	UDP 194.168.1.2:2807 -> 192.168.1.1:53 [proto: 5/DNS][cat: Network/14][1 pkts/82 bytes -> 0 pkts/0 bytes][Goodput ratio: 48/0][< 1 sec][::]
 	207	UDP 200.168.1.2:2735 -> 192.168.1.1:53 [proto: 5/DNS][cat: Network/14][1 pkts/82 bytes -> 0 pkts/0 bytes][Goodput ratio: 48/0][< 1 sec][Host: 1.0.0.127.in-adds.arpa][::]
-	208	TCP 147.234.1.253:21 -> 192.168.1.66:2720 [proto: 1/FTP_CONTROL][cat: Download-FileTransfer-FileSharing/7][1 pkts/81 bytes -> 0 pkts/0 bytes][Goodput ratio: 33/0][< 1 sec]
+	208	TCP 147.234.1.253:21 -> 192.168.1.66:2720 [proto: 251/WEBSOCKET][cat: Web/5][1 pkts/81 bytes -> 0 pkts/0 bytes][Goodput ratio: 33/0][< 1 sec]
 	209	UDP 192.168.1.2:2712 -> 192.37.115.0:53 [proto: 5/DNS][cat: Network/14][1 pkts/76 bytes -> 0 pkts/0 bytes][Goodput ratio: 44/0][< 1 sec][Host: sip.cybercrty.dk][::][PLAIN TEXT (cybercrty)]
 	210	UDP 192.168.1.2:2712 -> 192.168.1.1:53 [proto: 5/DNS][cat: Network/14][1 pkts/76 bytes -> 0 pkts/0 bytes][Goodput ratio: 44/0][< 1 sec][Host: sip.cybercity.dk][::][PLAIN TEXT (cybercity)]
 	211	UDP 192.168.1.2:2794 -> 192.168.108.1:53 [proto: 5/DNS][cat: Network/14][1 pkts/76 bytes -> 0 pkts/0 bytes][Goodput ratio: 44/0][< 1 sec][Host: sip.cybercity.dk][::][PLAIN TEXT (cybercity)]
 	212	UDP 192.114.1.2:2719 -> 192.168.1.1:53 [proto: 5/DNS][cat: Network/14][1 pkts/75 bytes -> 0 pkts/0 bytes][Goodput ratio: 43/0][< 1 sec][::]
-	213	TCP 147.234.1.253:21 -> 84.168.1.2:2720 [proto: 1/FTP_CONTROL][cat: Download-FileTransfer-FileSharing/7][1 pkts/73 bytes -> 0 pkts/0 bytes][Goodput ratio: 26/0][< 1 sec][PLAIN TEXT (200 Type set to I)]
-	214	TCP 192.168.1.2:2720 -> 147.117.1.253:21 [proto: 1/FTP_CONTROL][cat: Download-FileTransfer-FileSharing/7][1 pkts/73 bytes -> 0 pkts/0 bytes][Goodput ratio: 26/0][< 1 sec][PLAIN TEXT (RETR Site)]
-	215	TCP 192.168.1.2:2679 -> 147.234.1.253:21 [proto: 1/FTP_CONTROL][cat: Download-FileTransfer-FileSharing/7][1 pkts/66 bytes -> 0 pkts/0 bytes][Goodput ratio: 18/0][< 1 sec][PLAIN TEXT (PASS d0)]
+	213	TCP 147.234.1.253:21 -> 84.168.1.2:2720 [proto: 251/WEBSOCKET][cat: Web/5][1 pkts/73 bytes -> 0 pkts/0 bytes][Goodput ratio: 26/0][< 1 sec][PLAIN TEXT (200 Type set to I)]
+	214	TCP 192.168.1.2:2720 -> 147.117.1.253:21 [proto: 251/WEBSOCKET][cat: Web/5][1 pkts/73 bytes -> 0 pkts/0 bytes][Goodput ratio: 26/0][< 1 sec][PLAIN TEXT (RETR Site)]
+	215	TCP 192.168.1.2:2679 -> 147.234.1.253:21 [proto: 251/WEBSOCKET][cat: Web/5][1 pkts/66 bytes -> 0 pkts/0 bytes][Goodput ratio: 18/0][< 1 sec][PLAIN TEXT (PASS d0)]
 	216	TCP 192.168.1.71:2718 -> 147.137.21.122:139 [proto: 10/NetBIOS][cat: System/18][1 pkts/62 bytes -> 0 pkts/0 bytes][Goodput ratio: 0/0][< 1 sec]
-	217	TCP 147.234.1.253:21 -> 192.2.1.2:2720 [proto: 1/FTP_CONTROL][cat: Download-FileTransfer-FileSharing/7][1 pkts/60 bytes -> 0 pkts/0 bytes][Goodput ratio: 5/0][< 1 sec]
-	218	TCP 147.234.1.253:21 -> 192.168.1.2:2208 [proto: 1/FTP_CONTROL][cat: Download-FileTransfer-FileSharing/7][1 pkts/60 bytes -> 0 pkts/0 bytes][Goodput ratio: 5/0][< 1 sec]
-	219	TCP 192.112.1.2:2720 -> 147.234.1.253:21 [proto: 1/FTP_CONTROL][cat: Download-FileTransfer-FileSharing/7][1 pkts/60 bytes -> 0 pkts/0 bytes][Goodput ratio: 10/0][< 1 sec]
-	220	TCP 37.115.0.2:2639 -> 147.234.1.253:21 [proto: 1/FTP_CONTROL][cat: Download-FileTransfer-FileSharing/7][1 pkts/54 bytes -> 0 pkts/0 bytes][Goodput ratio: 0/0][< 1 sec]
-	221	UDP 192.168.1.6:5060 -> 212.242.33.35:5060 [proto: 100/SIP][cat: VoIP/10][1 pkts/47 bytes -> 0 pkts/0 bytes][Goodput ratio: 10/0][< 1 sec]
+	217	TCP 147.234.1.253:21 -> 192.2.1.2:2720 [proto: 251/WEBSOCKET][cat: Web/5][1 pkts/60 bytes -> 0 pkts/0 bytes][Goodput ratio: 5/0][< 1 sec]
+	218	TCP 147.234.1.253:21 -> 192.168.1.2:2208 [proto: 251/WEBSOCKET][cat: Web/5][1 pkts/60 bytes -> 0 pkts/0 bytes][Goodput ratio: 5/0][< 1 sec]
+	219	TCP 147.234.1.253:1045 -> 192.168.1.2:2720 [proto: 251/WEBSOCKET][cat: Web/5][1 pkts/60 bytes -> 0 pkts/0 bytes][Goodput ratio: 5/0][< 1 sec]
+	220	TCP 192.112.1.2:2720 -> 147.234.1.253:21 [proto: 251/WEBSOCKET][cat: Web/5][1 pkts/60 bytes -> 0 pkts/0 bytes][Goodput ratio: 10/0][< 1 sec]
+	221	TCP 37.115.0.2:2639 -> 147.234.1.253:21 [proto: 1/FTP_CONTROL][cat: Download-FileTransfer-FileSharing/7][1 pkts/54 bytes -> 0 pkts/0 bytes][Goodput ratio: 0/0][< 1 sec]
+	222	UDP 192.168.1.6:5060 -> 212.242.33.35:5060 [proto: 100/SIP][cat: VoIP/10][1 pkts/47 bytes -> 0 pkts/0 bytes][Goodput ratio: 10/0][< 1 sec]
 
 
 Undetected flows:
@@ -258,7 +260,6 @@ Undetected flows:
 	24	UDP 192.168.1.170:43690 -> 170.170.170.170:43690 [proto: 0/Unknown][1 pkts/82 bytes -> 0 pkts/0 bytes][Goodput ratio: 48/0][< 1 sec]
 	25	UDP 192.168.1.2:2712 -> 192.168.1.1:49973 [proto: 0/Unknown][1 pkts/76 bytes -> 0 pkts/0 bytes][Goodput ratio: 44/0][< 1 sec][PLAIN TEXT (cybercity)]
 	26	TCP 37.115.0.253:58999 -> 192.168.1.2:2721 [proto: 0/Unknown][1 pkts/62 bytes -> 0 pkts/0 bytes][Goodput ratio: 0/0][< 1 sec]
-	27	TCP 147.234.1.253:1045 -> 192.168.1.2:2720 [proto: 0/Unknown][1 pkts/60 bytes -> 0 pkts/0 bytes][Goodput ratio: 5/0][< 1 sec]
-	28	TCP 147.234.1.253:58999 -> 192.232.1.2:2721 [proto: 0/Unknown][1 pkts/60 bytes -> 0 pkts/0 bytes][Goodput ratio: 0/0][< 1 sec]
-	29	TCP 192.168.1.2:0 -> 147.234.1.253:0 [proto: 0/Unknown][1 pkts/54 bytes -> 0 pkts/0 bytes][Goodput ratio: 0/0][< 1 sec]
-	30	TCP 192.168.1.2:2721 -> 147.234.1.253:58999 [proto: 0/Unknown][1 pkts/54 bytes -> 0 pkts/0 bytes][Goodput ratio: 0/0][< 1 sec]
+	27	TCP 147.234.1.253:58999 -> 192.232.1.2:2721 [proto: 0/Unknown][1 pkts/60 bytes -> 0 pkts/0 bytes][Goodput ratio: 0/0][< 1 sec]
+	28	TCP 192.168.1.2:0 -> 147.234.1.253:0 [proto: 0/Unknown][1 pkts/54 bytes -> 0 pkts/0 bytes][Goodput ratio: 0/0][< 1 sec]
+	29	TCP 192.168.1.2:2721 -> 147.234.1.253:58999 [proto: 0/Unknown][1 pkts/54 bytes -> 0 pkts/0 bytes][Goodput ratio: 0/0][< 1 sec]

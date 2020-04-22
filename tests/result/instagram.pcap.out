@@ -1,10 +1,11 @@
 Unknown	1	66	1
-HTTP	116	91784	6
+HTTP	82	62745	5
 ICMP	5	510	1
 TLS	2	169	1
 Facebook	251	215986	5
 Dropbox	5	725	2
 Instagram	3062	2617399	22
+WEBSOCKET	34	29039	1
 
 JA3 Host Stats: 
 		 IP Address                  	 # JA3C     
@@ -25,7 +26,7 @@ JA3 Host Stats:
 	11	TCP 192.168.0.103:57936 <-> 82.85.26.162:80 [proto: 7.211/HTTP.Instagram][cat: SocialNetwork/6][24 pkts/1837 bytes <-> 34 pkts/48383 bytes][Goodput ratio: 14/95][0.51 sec][Host: photos-g.ak.instagram.com][bytes ratio: -0.927 (Download)][IAT c2s/s2c min/avg/max/stddev: 0/0 28/0 321/2 76/1][Pkt Len c2s/s2c min/avg/max/stddev: 66/186 77/1423 319/1484 51/249][URL: photos-g.ak.instagram.com/hphotos-ak-xaf1/t51.2885-15/e15/11386524_110257619317430_379513654_n.jpg][StatusCode: 200][ContentType: ][UserAgent: Instagram 7.1.1 Android (19/4.4.2; 480dpi; 1080x1920; samsung; GT-I9505; jflte; qcom; it_IT)][PLAIN TEXT (GET /hphotos)]
 	12	TCP 192.168.0.103:33936 <-> 31.13.93.52:443 [proto: 91.119/TLS.Facebook][cat: SocialNetwork/6][34 pkts/5555 bytes <-> 34 pkts/40133 bytes][Goodput ratio: 60/94][10.06 sec][bytes ratio: -0.757 (Download)][IAT c2s/s2c min/avg/max/stddev: 0/0 364/362 7669/7709 1462/1472][Pkt Len c2s/s2c min/avg/max/stddev: 66/66 163/1180 1431/1464 318/495][PLAIN TEXT (ny.iaXs)]
 	13	TCP 2.22.236.51:80 <-> 192.168.0.103:44151 [proto: 7/HTTP][cat: Web/5][25 pkts/37100 bytes <-> 24 pkts/1584 bytes][Goodput ratio: 96/0][0.04 sec][bytes ratio: 0.918 (Upload)][IAT c2s/s2c min/avg/max/stddev: 0/0 1/1 7/7 2/2][Pkt Len c2s/s2c min/avg/max/stddev: 1484/66 1484/66 1484/66 0/0][PLAIN TEXT (inOCIM)]
-	14	TCP 192.168.0.103:33976 <-> 77.67.29.17:80 [proto: 7/HTTP][cat: Web/5][14 pkts/924 bytes <-> 20 pkts/28115 bytes][Goodput ratio: 0/95][7.36 sec][bytes ratio: -0.936 (Download)][IAT c2s/s2c min/avg/max/stddev: 0/0 735/0 7321/3 2195/1][Pkt Len c2s/s2c min/avg/max/stddev: 66/66 66/1406 66/1484 0/309][PLAIN TEXT (dGQaNFV)]
+	14	TCP 192.168.0.103:33976 <-> 77.67.29.17:80 [proto: 251/WEBSOCKET][cat: Web/5][14 pkts/924 bytes <-> 20 pkts/28115 bytes][Goodput ratio: 0/95][7.36 sec][bytes ratio: -0.936 (Download)][IAT c2s/s2c min/avg/max/stddev: 0/0 735/0 7321/3 2195/1][Pkt Len c2s/s2c min/avg/max/stddev: 66/66 66/1406 66/1484 0/309][PLAIN TEXT (dGQaNFV)]
 	15	TCP 92.122.48.138:80 <-> 192.168.0.103:41562 [proto: 7/HTTP][cat: Web/5][16 pkts/22931 bytes <-> 9 pkts/594 bytes][Goodput ratio: 95/0][0.02 sec][bytes ratio: 0.950 (Upload)][IAT c2s/s2c min/avg/max/stddev: 0/0 1/1 5/4 1/1][Pkt Len c2s/s2c min/avg/max/stddev: 671/66 1433/66 1484/66 197/0][PLAIN TEXT (DD.DOo)]
 	16	TCP 192.168.0.103:60908 <-> 46.33.70.136:443 [proto: 91.211/TLS.Instagram][cat: SocialNetwork/6][10 pkts/1369 bytes <-> 9 pkts/7971 bytes][Goodput ratio: 51/92][0.19 sec][bytes ratio: -0.707 (Download)][IAT c2s/s2c min/avg/max/stddev: 0/0 19/23 56/88 18/31][Pkt Len c2s/s2c min/avg/max/stddev: 66/66 137/886 375/1484 114/640][TLSv1][Client: igcdn-photos-g-a.akamaihd.net][JA3C: 54ae5fcb0159e2ddf6a50e149221c7c7][ServerNames: a248.e.akamai.net,*.akamaihd.net,*.akamaihd-staging.net,*.akamaized.net,*.akamaized-staging.net][JA3S: 34d6f0ad0a79e4cfdf145e640cc93f78][Organization: Akamai Technologies Inc.][Certificate SHA-1: EA:5A:20:95:78:D7:09:60:5C:A1:E4:CA:A5:2B:BD:C1:78:FB:23:23][Validity: 2015-06-19 16:52:07 - 2016-06-19 16:52:05][Cipher: TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA]
 	17	TCP 192.168.0.103:44558 <-> 46.33.70.174:443 [proto: 91.211/TLS.Instagram][cat: SocialNetwork/6][10 pkts/1545 bytes <-> 7 pkts/4824 bytes][Goodput ratio: 57/90][0.17 sec][bytes ratio: -0.515 (Download)][IAT c2s/s2c min/avg/max/stddev: 0/0 21/29 79/103 25/38][Pkt Len c2s/s2c min/avg/max/stddev: 66/66 154/689 516/1484 151/647][TLSv1][Client: igcdn-photos-h-a.akamaihd.net][JA3C: 54ae5fcb0159e2ddf6a50e149221c7c7][ServerNames: a248.e.akamai.net,*.akamaihd.net,*.akamaihd-staging.net,*.akamaized.net,*.akamaized-staging.net][JA3S: 7df57c06f869fc3ce509521cae2f75ce][Organization: Akamai Technologies Inc.][Certificate SHA-1: EA:5A:20:95:78:D7:09:60:5C:A1:E4:CA:A5:2B:BD:C1:78:FB:23:23][Validity: 2015-06-19 16:52:07 - 2016-06-19 16:52:05][Cipher: TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA]
