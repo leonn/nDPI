@@ -29,21 +29,21 @@
 
 static void ndpi_int_imo_add_connection(struct ndpi_detection_module_struct
 					*ndpi_struct, struct ndpi_flow_struct *flow) {
-  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_IMO, NDPI_PROTOCOL_UNKNOWN);
+  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_IMO, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
 void ndpi_search_imo(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   NDPI_LOG_DBG(ndpi_struct, "search IMO\n");
 
   if(packet->payload_packet_len == 1) {
     /* Two one byte consecutive packets with the same payload */ 
-    if((flow->protos.imo.last_one_byte_pkt == 1)
-       && (flow->protos.imo.last_byte == packet->payload[0]))
+    if((flow->l4.udp.imo_last_one_byte_pkt == 1)
+       && (flow->l4.udp.imo_last_byte == packet->payload[0]))
       ndpi_int_imo_add_connection(ndpi_struct, flow);
     else
-      flow->protos.imo.last_one_byte_pkt = 1, flow->protos.imo.last_byte = packet->payload[0];
+      flow->l4.udp.imo_last_one_byte_pkt = 1, flow->l4.udp.imo_last_byte = packet->payload[0];
   } else if(((packet->payload_packet_len == 10)
 	 && (packet->payload[0] == 0x09)
 	 && (packet->payload[1] == 0x02))
@@ -62,7 +62,7 @@ void ndpi_search_imo(struct ndpi_detection_module_struct *ndpi_struct, struct nd
     if(flow->num_processed_pkts > 5)
       NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
     else
-      flow->protos.imo.last_one_byte_pkt = 0;
+      flow->l4.udp.imo_last_one_byte_pkt = 0;
   }
 }
 

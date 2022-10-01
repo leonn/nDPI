@@ -1,8 +1,8 @@
 /*
  * telnet.c
  *
- * Copyright (C) 2011-20 - ntop.org
- * Copyright (C) 2009-2011 by ipoque GmbH
+ * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2009-11 - ipoque GmbH
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -35,11 +35,12 @@
 
 static int search_telnet_again(struct ndpi_detection_module_struct *ndpi_struct,
 			       struct ndpi_flow_struct *flow) {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   int i;
 
 #ifdef TELNET_DEBUG
-  printf("==> %s() [%s][direction: %u]\n", __FUNCTION__, packet->payload, packet->packet_direction);
+  printf("==> %s() [%.*s][direction: %u]\n", __FUNCTION__, packet->payload_packet_len,
+	 packet->payload, packet->packet_direction);
 #endif
   
   if((packet->payload == NULL)
@@ -63,6 +64,7 @@ static int search_telnet_again(struct ndpi_detection_module_struct *ndpi_struct,
 	return(1);
 	
       flow->protos.telnet.password_detected = 1;
+      ndpi_set_risk(ndpi_struct, flow, NDPI_CLEAR_TEXT_CREDENTIALS, "Found password");
       flow->protos.telnet.password[flow->protos.telnet.character_id] = '\0';
       return(0);
     }
@@ -88,16 +90,35 @@ static int search_telnet_again(struct ndpi_detection_module_struct *ndpi_struct,
   }
 
   if(packet->payload[0] == '\r') {
+    char buf[64];
+    
     flow->protos.telnet.username_detected = 1;
     flow->protos.telnet.username[flow->protos.telnet.character_id] = '\0';
     flow->protos.telnet.character_id = 0;
+
+    snprintf(buf, sizeof(buf), "Found Telnet username (%s)",
+	     flow->protos.telnet.username);
+    ndpi_set_risk(ndpi_struct, flow, NDPI_CLEAR_TEXT_CREDENTIALS, buf);
+
     return(1);
   }
 
   for(i=0; i<packet->payload_packet_len; i++) {
     if(packet->packet_direction == 0) /* client -> server */ {
       if(flow->protos.telnet.character_id < (sizeof(flow->protos.telnet.username)-1))
-	flow->protos.telnet.username[flow->protos.telnet.character_id++] = packet->payload[i];
+      {
+        if (i>=packet->payload_packet_len-2 &&
+            (packet->payload[i] == '\r' || packet->payload[i] == '\n'))
+        {
+          continue;
+        }
+        else if (ndpi_isprint(packet->payload[i]) == 0)
+        {
+          flow->protos.telnet.username[flow->protos.telnet.character_id++] = '?';
+        } else {
+          flow->protos.telnet.username[flow->protos.telnet.character_id++] = packet->payload[i];
+        }
+      }
     }
   }
 
@@ -109,14 +130,10 @@ static int search_telnet_again(struct ndpi_detection_module_struct *ndpi_struct,
 
 static void ndpi_int_telnet_add_connection(struct ndpi_detection_module_struct
 					   *ndpi_struct, struct ndpi_flow_struct *flow) {
-  flow->guessed_host_protocol_id = flow->guessed_protocol_id = NDPI_PROTOCOL_TELNET;
-
-  /* This is necessary to inform the core to call this dissector again */
-  flow->check_extra_packets = 1;
   flow->max_extra_packets_to_check = 64;
   flow->extra_packets_func = search_telnet_again;
 
-  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_TELNET, NDPI_PROTOCOL_UNKNOWN);
+  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_TELNET, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
 /* ************************************************************************ */
@@ -130,7 +147,7 @@ __forceinline static
 #endif
 u_int8_t search_iac(struct ndpi_detection_module_struct *ndpi_struct,
 		    struct ndpi_flow_struct *flow) {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   u_int16_t a;
 

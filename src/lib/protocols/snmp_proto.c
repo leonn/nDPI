@@ -1,11 +1,7 @@
 /*
  * snmp.c
  *
- * Copyright (C) 2009-2011 by ipoque GmbH
- * Copyright (C) 2011-20 - ntop.org
- *
- * This file is part of nDPI, an open source deep packet inspection
- * library based on the OpenDPI and PACE technology by ipoque GmbH
+ * Copyright (C) 2011-22 - ntop.org
  *
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -28,106 +24,127 @@
 
 #include "ndpi_api.h"
 
+/* #define SNMP_DEBUG */
+
+static void ndpi_search_snmp(struct ndpi_detection_module_struct *ndpi_struct,
+			     struct ndpi_flow_struct *flow);
+
+/* *************************************************************** */
+
 static void ndpi_int_snmp_add_connection(struct ndpi_detection_module_struct
-					 *ndpi_struct, struct ndpi_flow_struct *flow)
-{
-  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SNMP, NDPI_PROTOCOL_UNKNOWN);
+					 *ndpi_struct, struct ndpi_flow_struct *flow) {
+  NDPI_LOG_INFO(ndpi_struct, "found SNMP\n");
+  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SNMP,
+			     NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
-void ndpi_search_snmp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
-{
-  struct ndpi_packet_struct *packet = &flow->packet;
+/* *************************************************************** */
 
-  NDPI_LOG_DBG(ndpi_struct, "search SNMP\n");
-	
-  if (packet->payload_packet_len > 32 && packet->payload[0] == 0x30) {
-    int offset;
-    u_int16_t u16;
-    
-    switch (packet->payload[1]) {
-    case 0x81:
-      offset = 3;
-      break;
-    case 0x82:
-      offset = 4;
-      break;
-    default:
-      if (packet->payload[1] > 0x82) {
-	NDPI_LOG_DBG2(ndpi_struct, "SNMP excluded, second byte is > 0x82\n");
-	goto excl;
-      }
-      offset = 2;
-    }
+static int ndpi_search_snmp_again(struct ndpi_detection_module_struct *ndpi_struct,
+				      struct ndpi_flow_struct *flow) {
 
-    u16 = ntohs(get_u_int16_t(packet->payload, offset));
-    
-    if((u16 != 0x0201) && (u16 != 0x0204)) {
-      NDPI_LOG_DBG2(ndpi_struct, "SNMP excluded, 0x0201/0x0204 pattern not found\n");
-      goto excl;
-    }
+  ndpi_search_snmp(ndpi_struct, flow);
 
-    if (packet->payload[offset + 2] >= 0x04) {
-      NDPI_LOG_DBG2(ndpi_struct, "SNMP excluded, version > 3\n");
-      goto excl;
-    }
+#ifdef SNMP_DEBUG
+  printf("=> %s()\n", __FUNCTION__);
+#endif
 
-    if (flow->l4.udp.snmp_stage == 0) {
-      if (packet->udp->dest == htons(161) || packet->udp->dest == htons(162)) {
-	NDPI_LOG_INFO(ndpi_struct, "found SNMP by port\n");
-	ndpi_int_snmp_add_connection(ndpi_struct, flow);
-	return;
+  return((flow->extra_packets_func == NULL) /* We're good now */ ? 0 : 1);
+}
+
+/* *************************************************************** */
+
+void ndpi_search_snmp(struct ndpi_detection_module_struct *ndpi_struct,
+		      struct ndpi_flow_struct *flow) {
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
+  u_int16_t snmp_port = htons(161), trap_port = htons(162);
+
+  if((packet->udp->source != snmp_port) &&
+     (packet->udp->dest != snmp_port) &&
+     (packet->udp->source != trap_port) &&
+     (packet->udp->dest != trap_port)) {
+    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    return;
+  }
+
+  if(packet->payload_packet_len > 16 && packet->payload[0] == 0x30) {
+    u_int16_t len_length = 0, offset;
+    int64_t len;
+
+    len = ndpi_asn1_ber_decode_length(&packet->payload[1], packet->payload_packet_len - 1, &len_length);
+
+    if(len > 2 &&
+       1 + len_length + len == packet->payload_packet_len &&
+       (packet->payload[1 + len_length + 2] == 0 /* SNMPv1 */ ||
+        packet->payload[1 + len_length + 2] == 1 /* SNMPv2c */ ||
+        packet->payload[1 + len_length + 2] == 3 /* SNMPv3 */)) {
+
+      if(flow->extra_packets_func == NULL) {
+        ndpi_int_snmp_add_connection(ndpi_struct, flow);
+        flow->protos.snmp.version = packet->payload[1 + len_length + 2];
       }
-      NDPI_LOG_DBG2(ndpi_struct, "SNMP stage 0\n");
-      if (packet->payload[offset + 2] == 3) {
-	flow->l4.udp.snmp_msg_id = ntohs(get_u_int32_t(packet->payload, offset + 8));
-      } else if (packet->payload[offset + 2] == 0) {
-	flow->l4.udp.snmp_msg_id = get_u_int8_t(packet->payload, offset + 15);
-      } else {
-	flow->l4.udp.snmp_msg_id = ntohs(get_u_int16_t(packet->payload, offset + 15));
+
+      offset = 1 + len_length + 2;
+      if((packet->payload[offset] == 0 /* SNMPv1 */ ||
+          packet->payload[offset] == 1 /* SNMPv2c */) &&
+	 (offset + 2 < packet->payload_packet_len)) {
+
+        if(flow->extra_packets_func == NULL) {
+          flow->max_extra_packets_to_check = 8;
+          flow->extra_packets_func = ndpi_search_snmp_again;
+        }
+
+        u_int8_t community_len = packet->payload[offset + 2];
+        u_int8_t snmp_primitive_offset = offset + 2 + 1 + community_len;
+
+        if(snmp_primitive_offset < packet->payload_packet_len) {
+          u_int8_t snmp_primitive = packet->payload[snmp_primitive_offset] & 0xF;
+
+          flow->protos.snmp.primitive = snmp_primitive;
+
+          if(snmp_primitive == 2 /* Get Response */ &&
+             snmp_primitive_offset + 1 < packet->payload_packet_len) {
+            offset = snmp_primitive_offset + 1;
+            ndpi_asn1_ber_decode_length(&packet->payload[offset], packet->payload_packet_len - offset, &len_length);
+            offset += len_length + 1;
+            if(offset < packet->payload_packet_len) {
+              len = ndpi_asn1_ber_decode_length(&packet->payload[offset], packet->payload_packet_len - offset, &len_length);
+
+              u_int8_t error_status_offset = offset + len_length + len + 2;
+
+              if(error_status_offset < packet->payload_packet_len) {
+                u_int8_t error_status = packet->payload[error_status_offset];
+
+#ifdef SNMP_DEBUG
+                printf("-> %u [offset: %u][primitive: %u]\n",
+                       error_status, error_status_offset, snmp_primitive);
+#endif
+
+                flow->extra_packets_func = NULL; /* We're good now */
+
+		flow->protos.snmp.error_status = error_status;
+
+                if(error_status != 0) {
+                  char str[64];
+
+                  snprintf(str, sizeof(str), "SNMP Error %d", error_status);
+                  ndpi_set_risk(ndpi_struct, flow, NDPI_ERROR_CODE_DETECTED, str);
+	        }
+              }
+            }
+          }
+        }
       }
-      flow->l4.udp.snmp_stage = 1 + packet->packet_direction;
-      return;
-    } else if (flow->l4.udp.snmp_stage == 1 + packet->packet_direction) {
-      if (packet->payload[offset + 2] == 0) {
-	if (flow->l4.udp.snmp_msg_id != get_u_int8_t(packet->payload, offset + 15) - 1) {
-	  NDPI_LOG_DBG2(ndpi_struct,
-		   "SNMP v1 excluded, message ID doesn't match\n");
-	  goto excl;
-	}
-      }
-    } else if (flow->l4.udp.snmp_stage == 2 - packet->packet_direction) {
-      NDPI_LOG_DBG2(ndpi_struct, "SNMP stage 1-2\n");
-      if (packet->payload[offset + 2] == 3) {
-	if (flow->l4.udp.snmp_msg_id != ntohs(get_u_int32_t(packet->payload, offset + 8))) {
-	  NDPI_LOG_DBG2(ndpi_struct,
-		   "SNMP v3 excluded, message ID doesn't match\n");
-	  goto excl;
-	}
-      } else if (packet->payload[offset + 2] == 0) {
-	if (flow->l4.udp.snmp_msg_id != get_u_int8_t(packet->payload, offset + 15)) {
-	  NDPI_LOG_DBG2(ndpi_struct,
-		   "SNMP v1 excluded, message ID doesn't match\n");
-	  goto excl;
-	}
-      } else {
-	if (flow->l4.udp.snmp_msg_id != ntohs(get_u_int16_t(packet->payload, offset + 15))) {
-	  NDPI_LOG_DBG2(ndpi_struct,
-		   "SNMP v2 excluded, message ID doesn't match\n");
-	  goto excl;
-	}
-      }
-      NDPI_LOG_INFO(ndpi_struct, "found SNMP\n");
-      ndpi_int_snmp_add_connection(ndpi_struct, flow);
+
       return;
     }
   }
- excl:
+
   NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
 }
 
-
-void init_snmp_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
-{
+void init_snmp_dissector(struct ndpi_detection_module_struct *ndpi_struct,
+			 u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask) {
   ndpi_set_bitmask_protocol_detection("SNMP", ndpi_struct, detection_bitmask, *id,
 				      NDPI_PROTOCOL_SNMP,
 				      ndpi_search_snmp,

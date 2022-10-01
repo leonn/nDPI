@@ -1,7 +1,7 @@
 /*
  * telegram.c
  *
- * Copyright (C) 2012-20 - ntop.org
+ * Copyright (C) 2012-22 - ntop.org
  * Copyright (C) 2014 by Gianluca Costa xplico.org
  *
  * This file is part of nDPI, an open source deep packet inspection
@@ -31,7 +31,7 @@
 
 static void ndpi_int_telegram_add_connection(struct ndpi_detection_module_struct
                                              *ndpi_struct, struct ndpi_flow_struct *flow) {
-  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_TELEGRAM, NDPI_PROTOCOL_UNKNOWN);
+  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_TELEGRAM, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
   NDPI_LOG_INFO(ndpi_struct, "found telegram\n");
 }
 
@@ -45,12 +45,9 @@ static u_int8_t is_telegram_port_range(u_int16_t port) {
 
 void ndpi_search_telegram(struct ndpi_detection_module_struct *ndpi_struct,
 			  struct ndpi_flow_struct *flow) {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   NDPI_LOG_DBG(ndpi_struct, "search telegram\n");
-
-  if(packet->payload_packet_len == 0)
-    return;
 
   if(packet->tcp != NULL) {
     if(packet->payload_packet_len > 56) {
@@ -112,7 +109,7 @@ void init_telegram_dissector(struct ndpi_detection_module_struct *ndpi_struct, u
   ndpi_set_bitmask_protocol_detection("Telegram", ndpi_struct, detection_bitmask, *id,
 				      NDPI_PROTOCOL_TELEGRAM,
 				      ndpi_search_telegram,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP,
+				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
 				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
 				      ADD_TO_DETECTION_BITMASK);
 

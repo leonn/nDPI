@@ -1,3 +1,24 @@
+Guessed flow protos:	0
+
+DPI Packets (UDP):	4	(4.00 pkts/flow)
+Confidence DPI              : 1 (flows)
+Num dissector calls: 145 (145.00 diss/flow)
+LRU cache ookla:      0/0/0 (insert/search/found)
+LRU cache bittorrent: 0/0/0 (insert/search/found)
+LRU cache zoom:       0/0/0 (insert/search/found)
+LRU cache stun:       0/0/0 (insert/search/found)
+LRU cache tls_cert:   0/0/0 (insert/search/found)
+LRU cache mining:     0/0/0 (insert/search/found)
+LRU cache msteams:    0/0/0 (insert/search/found)
+Automa host:          0/0 (search/found)
+Automa domain:        0/0 (search/found)
+Automa tls cert:      0/0 (search/found)
+Automa risk mask:     0/0 (search/found)
+Automa common alpns:  0/0 (search/found)
+Patricia risk mask:   2/0 (search/found)
+Patricia risk:        0/0 (search/found)
+Patricia protocols:   4/0 (search/found)
+
 WireGuard	2399	734182	1
 
-	1	UDP 139.162.192.157:51820 <-> 192.168.0.14:36116 [proto: 206/WireGuard][cat: VPN/2][1362 pkts/518526 bytes <-> 1037 pkts/215656 bytes][Goodput ratio: 89/80][381.21 sec][bytes ratio: 0.413 (Upload)][IAT c2s/s2c min/avg/max/stddev: 0/0 269/314 10882/13538 1143/1242][Pkt Len c2s/s2c min/avg/max/stddev: 74/74 381/208 1404/1404 524/241][PLAIN TEXT (RJxM17)][Plen Bins: 0,0,0,35,43,5,2,0,6,2,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0]
+	1	UDP 139.162.192.157:51820 <-> 192.168.0.14:36116 [proto: 206/WireGuard][IP: 0/Unknown][Encrypted][Confidence: DPI][cat: VPN/2][1362 pkts/518526 bytes <-> 1037 pkts/215656 bytes][Goodput ratio: 89/80][381.21 sec][bytes ratio: 0.413 (Upload)][IAT c2s/s2c min/avg/max/stddev: 0/0 269/314 10882/13538 1111/1204][Pkt Len c2s/s2c min/avg/max/stddev: 74/74 381/208 1404/1404 362/135][Plen Bins: 0,0,0,35,43,5,2,0,6,2,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0]

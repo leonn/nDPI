@@ -1,8 +1,8 @@
 /*
  * mysql.c
  * 
- * Copyright (C) 2009-2011 by ipoque GmbH
- * Copyright (C) 2011-20 - ntop.org
+ * Copyright (C) 2009-11 - ipoque GmbH
+ * Copyright (C) 2011-22 - ntop.org
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -30,19 +30,21 @@
 #include "ndpi_api.h"
 
 void ndpi_search_mysql_tcp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   NDPI_LOG_DBG(ndpi_struct, "search MySQL\n");
 	
   if(packet->tcp) {
-    if(packet->payload_packet_len > 38	//min length
-       && get_u_int16_t(packet->payload, 0) == packet->payload_packet_len - 4	//first 3 bytes are length
-       && get_u_int8_t(packet->payload, 2) == 0x00	//3rd byte of packet length
-       && get_u_int8_t(packet->payload, 3) == 0x00	//packet sequence number is 0 for startup packet
-       && get_u_int8_t(packet->payload, 5) > 0x30	//server version > 0
-       && get_u_int8_t(packet->payload, 5) < 0x39	//server version < 9
-       && get_u_int8_t(packet->payload, 6) == 0x2e	//dot
-       ) {
+    if(packet->payload_packet_len > 38) { //min length
+      u_int32_t length = (packet->payload[2] << 16) + (packet->payload[1] << 8) + packet->payload[0];
+
+      if(length == (u_int32_t)packet->payload_packet_len - 4	//first 3 bytes are length
+         && get_u_int8_t(packet->payload, 2) == 0x00	//3rd byte of packet length
+         && get_u_int8_t(packet->payload, 3) == 0x00	//packet sequence number is 0 for startup packet
+         && get_u_int8_t(packet->payload, 5) > 0x30	//server version > 0
+         && get_u_int8_t(packet->payload, 5) < 0x39	//server version < 9
+         && get_u_int8_t(packet->payload, 6) == 0x2e	//dot
+        ) {
 #if 0
       /* Old code */
       u_int32_t a;
@@ -54,7 +56,7 @@ void ndpi_search_mysql_tcp(struct ndpi_detection_module_struct *ndpi_struct, str
 	     && get_u_int32_t(packet->payload, a + 27) == 0x0	 // filler bytes
 	     && get_u_int8_t(packet->payload, a + 31) == 0x0) {
 	    NDPI_LOG_INFO(ndpi_struct, "found MySQL\n");
-	    ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_MYSQL, NDPI_PROTOCOL_UNKNOWN);
+	    ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_MYSQL, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 	    return;
 	  }
 	  
@@ -62,13 +64,14 @@ void ndpi_search_mysql_tcp(struct ndpi_detection_module_struct *ndpi_struct, str
 	}
       }
 #else
-      if(strncmp((const char*)&packet->payload[packet->payload_packet_len-22],
-		 "mysql_", 6) == 0) {
-	NDPI_LOG_INFO(ndpi_struct, "found MySQL\n");
-	ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_MYSQL,  NDPI_PROTOCOL_UNKNOWN);
-	return;
-      }
+        if(strncmp((const char*)&packet->payload[packet->payload_packet_len-22],
+		   "mysql_", 6) == 0) {
+	  NDPI_LOG_INFO(ndpi_struct, "found MySQL\n");
+	  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_MYSQL,  NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+	  return;
+        }
 #endif
+      }
     }
   }
 

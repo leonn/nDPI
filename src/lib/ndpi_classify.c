@@ -657,24 +657,24 @@ ndpi_timer_clear(pkt_timeval *a)
 /**
  * \brief Calculate the milliseconds representation of a timeval.
  * \param ts Timeval
- * \return unsigned int - Milliseconds
+ * \return unsigned int (64bit) - Milliseconds
  */
-unsigned int
+u_int64_t
 ndpi_timeval_to_milliseconds(pkt_timeval ts)
 {
-  unsigned int result = ts.tv_usec / 1000 + ts.tv_sec * 1000;
+  u_int64_t result = ts.tv_usec / 1000 + ts.tv_sec * 1000;
   return result;
 }
 
 /**
  * \brief Calculate the microseconds representation of a timeval.
  * \param ts Timeval
- * \return unsigned int - Milliseconds
+ * \return unsigned int (64bit) - Microseconds
  */
-unsigned int
+u_int64_t
 ndpi_timeval_to_microseconds(pkt_timeval ts)
 {
-  unsigned int result = ts.tv_usec + ts.tv_sec * 1000 * 1000;
+  u_int64_t result = ts.tv_usec + ts.tv_sec * 1000 * 1000;
   return result;
 }
 
@@ -688,7 +688,13 @@ ndpi_log_timestamp(char *log_ts, uint32_t log_ts_len)
 
   gettimeofday(&tv, NULL);
   nowtime = tv.tv_sec;
+#ifdef WIN32
+  /* localtime() on Windows is thread-safe */
+  struct tm * nowtm_r_ptr = localtime(&nowtime);
+  nowtm_r = *nowtm_r_ptr;
+#else
   localtime_r(&nowtime, &nowtm_r);
+#endif
   strftime(tmbuf, NDPI_TIMESTAMP_LEN, "%H:%M:%S", &nowtm_r);
-  snprintf(log_ts, log_ts_len, "%s.%06ld", tmbuf, (long)tv.tv_usec);
+  ndpi_snprintf(log_ts, log_ts_len, "%s.%06ld", tmbuf, (long)tv.tv_usec);
 }

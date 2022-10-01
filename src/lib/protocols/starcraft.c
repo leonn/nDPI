@@ -2,7 +2,7 @@
 * starcraft.c
 * 
 * Copyright (C) 2015 - Matteo Bracci <matteobracci1@gmail.com>
-* Copyright (C) 2015-20 - ntop.org
+* Copyright (C) 2015-22 - ntop.org
 *
 * nDPI is free software: you can redistribute it and/or modify
 * it under the terms of the GNU Lesser General Public License as published by
@@ -49,10 +49,12 @@ u_int8_t sc2_match_logon_ip(struct ndpi_packet_struct* packet)
 */
 u_int8_t ndpi_check_starcraft_tcp(struct ndpi_detection_module_struct* ndpi_struct, struct ndpi_flow_struct* flow)
 {
-  if (sc2_match_logon_ip(&flow->packet)
-      && flow->packet.tcp->dest == htons(1119)	//bnetgame port
-      && (ndpi_match_strprefix(flow->packet.payload, flow->packet.payload_packet_len, "\x4a\x00\x00\x0a\x66\x02\x0a\xed\x2d\x66") 
-	  || ndpi_match_strprefix(flow->packet.payload, flow->packet.payload_packet_len, "\x49\x00\x00\x0a\x66\x02\x0a\xed\x2d\x66")))
+  struct ndpi_packet_struct* packet = &ndpi_struct->packet;
+
+  if (sc2_match_logon_ip(packet)
+      && packet->tcp->dest == htons(1119)	//bnetgame port
+      && (ndpi_match_strprefix(packet->payload, packet->payload_packet_len, "\x4a\x00\x00\x0a\x66\x02\x0a\xed\x2d\x66") 
+	  || ndpi_match_strprefix(packet->payload, packet->payload_packet_len, "\x49\x00\x00\x0a\x66\x02\x0a\xed\x2d\x66")))
     return 1;
   else
     return -1;
@@ -66,7 +68,7 @@ u_int8_t ndpi_check_starcraft_tcp(struct ndpi_detection_module_struct* ndpi_stru
 */
 u_int8_t ndpi_check_starcraft_udp(struct ndpi_detection_module_struct* ndpi_struct, struct ndpi_flow_struct* flow)
 {
-  struct ndpi_packet_struct* packet = &flow->packet;
+  struct ndpi_packet_struct* packet = &ndpi_struct->packet;
 
   /* First off, filter out any traffic not using port 1119, removing the chance of any false positive if we assume that non allowed protocols don't use the port */
   if (packet->udp->source != htons(1119) && packet->udp->dest != htons(1119))
@@ -114,16 +116,17 @@ u_int8_t ndpi_check_starcraft_udp(struct ndpi_detection_module_struct* ndpi_stru
 
 void ndpi_search_starcraft(struct ndpi_detection_module_struct* ndpi_struct, struct ndpi_flow_struct* flow)
 {
+  struct ndpi_packet_struct* packet = &ndpi_struct->packet;
+
   NDPI_LOG_DBG(ndpi_struct, "search Starcraft\n");
-  if (flow->packet.detected_protocol_stack[0] != NDPI_PROTOCOL_STARCRAFT) {
-    struct ndpi_packet_struct* packet = &flow->packet;
+  if (flow->detected_protocol_stack[0] != NDPI_PROTOCOL_STARCRAFT) {
     int8_t result = 0;
 
     if (packet->udp != NULL) {
       result = ndpi_check_starcraft_udp(ndpi_struct, flow);
       if (result == 1) {
 	NDPI_LOG_INFO(ndpi_struct, "Found Starcraft 2 [Game, UDP]\n");
-        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_STARCRAFT, NDPI_PROTOCOL_UNKNOWN);
+        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_STARCRAFT, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 	return;
       }
     }
@@ -131,7 +134,7 @@ void ndpi_search_starcraft(struct ndpi_detection_module_struct* ndpi_struct, str
       result = ndpi_check_starcraft_tcp(ndpi_struct, flow);
       if (result == 1) {
 	NDPI_LOG_INFO(ndpi_struct, "Found Starcraft 2 [Client, TCP]\n");
-        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_STARCRAFT, NDPI_PROTOCOL_UNKNOWN);
+        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_STARCRAFT, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 	return;
       }
     }

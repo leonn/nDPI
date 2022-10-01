@@ -1,7 +1,7 @@
 /*
  * s7comm.c
  *
- * Copyright (C) 2011-20 - ntop.org
+ * Copyright (C) 2011-22 - ntop.org
  * 
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -26,14 +26,14 @@
 
 void ndpi_search_s7comm_tcp(struct ndpi_detection_module_struct *ndpi_struct,
                             struct ndpi_flow_struct *flow) {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   NDPI_LOG_DBG(ndpi_struct, "search S7\n");
   u_int16_t s7comm_port = htons(102); 
   if(packet->tcp) {
     
     if((packet->payload_packet_len >= 2) && (packet->payload[0]==0x03)&&(packet->payload[1]==0x00)&&((packet->tcp->dest == s7comm_port) || (packet->tcp->source == s7comm_port))) {
       NDPI_LOG_INFO(ndpi_struct, "found S7\n");
-      ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_S7COMM, NDPI_PROTOCOL_UNKNOWN);
+      ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_S7COMM, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 
       return;
       
@@ -48,10 +48,11 @@ void init_s7comm_dissector(struct ndpi_detection_module_struct *ndpi_struct,
                            u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask) {
       
   ndpi_set_bitmask_protocol_detection("S7COMM", ndpi_struct, detection_bitmask, *id,
-                              NDPI_PROTOCOL_S7COMM,
-                              ndpi_search_s7comm_tcp,                            NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-                              SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-                              ADD_TO_DETECTION_BITMASK);
+				      NDPI_PROTOCOL_S7COMM,
+				      ndpi_search_s7comm_tcp,
+				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
+				      ADD_TO_DETECTION_BITMASK);
   *id += 1;
 }
 

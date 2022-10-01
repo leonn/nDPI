@@ -29,7 +29,7 @@
 
 void ndpi_search_modbus_tcp(struct ndpi_detection_module_struct *ndpi_struct,
                             struct ndpi_flow_struct *flow) {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   NDPI_LOG_DBG(ndpi_struct, "search Modbus\n");
   u_int16_t modbus_port = htons(502); // port used by modbus
 
@@ -47,7 +47,7 @@ void ndpi_search_modbus_tcp(struct ndpi_detection_module_struct *ndpi_struct,
       // the fourth parameter of the payload is the length of the segment            
       if((modbus_len-1) == (packet->payload_packet_len - 7 /* ModbusTCP header len */)) {
 	NDPI_LOG_INFO(ndpi_struct, "found MODBUS\n");
-	ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_MODBUS, NDPI_PROTOCOL_UNKNOWN);
+	ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_MODBUS, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 	return;
       }
     }

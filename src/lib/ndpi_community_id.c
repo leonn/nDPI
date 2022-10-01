@@ -1,7 +1,7 @@
 /*
  * ndpi_community_id.c
  *
- * Copyright (C) 2011-20 - ntop.org
+ * Copyright (C) 2011-22 - ntop.org
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -20,10 +20,6 @@
  * along with nDPI.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
-#ifdef HAVE_CONFIG_H
-#include "ndpi_config.h"
-#endif
 
 #include <stdlib.h>
 #include <errno.h>
@@ -70,7 +66,7 @@
 
 /* **************************************************** */
 
-static ssize_t ndpi_community_id_buf_copy(u_int8_t * const dst, const void * const src, ssize_t len) {
+static u_int16_t ndpi_community_id_buf_copy(u_int8_t * const dst, const void * const src, u_int16_t len) {
   if(src)
     memcpy(dst, src, len);
   else
@@ -185,11 +181,11 @@ void ndpi_string_sha1_hash(const uint8_t *message, size_t len, u_char *hash /* 2
 /* **************************************************** */
 
 /*
-https://github.com/corelight/community-id-spec/blob/bda913f617389df07cdaa23606e11bbd318e265c/community-id.py#L285
+  https://github.com/corelight/community-id-spec/blob/bda913f617389df07cdaa23606e11bbd318e265c/community-id.py#L285
 */
 static int ndpi_community_id_finalize_and_compute_hash(u_int8_t *comm_buf, u_int16_t off, u_int8_t l4_proto,
 						       u_int16_t src_port, u_int16_t dst_port,
-						       char *hash_buf, u_int8_t hash_buf_len) {
+						       char *hash_buf, size_t hash_buf_len) {
   u_int8_t pad = 0;
   uint32_t hash[5];
   char *community_id;
@@ -204,7 +200,7 @@ static int ndpi_community_id_finalize_and_compute_hash(u_int8_t *comm_buf, u_int
   switch(l4_proto) {
   case IPPROTO_ICMP:
   case IPPROTO_ICMPV6:
-  case IPPROTO_SCTP:
+  case NDPI_SCTP_PROTOCOL_TYPE:
   case IPPROTO_UDP:
   case IPPROTO_TCP:
     off += ndpi_community_id_buf_copy(&comm_buf[off], &src_port, sizeof(src_port));
@@ -285,7 +281,7 @@ int ndpi_flowv4_flow_hash(u_int8_t l4_proto, u_int32_t src_ip, u_int32_t dst_ip,
     src_port = icmp_type;
     dst_port = ndpi_community_id_icmp_type_to_code_v4(icmp_type, icmp_code, &icmp_one_way);
     break;
-  case IPPROTO_SCTP:
+  case NDPI_SCTP_PROTOCOL_TYPE:
   case IPPROTO_UDP:
   case IPPROTO_TCP:
     /* src/dst port ok */
@@ -344,7 +340,7 @@ int ndpi_flowv6_flow_hash(u_int8_t l4_proto, struct ndpi_in6_addr *src_ip, struc
     src_port = icmp_type;
     dst_port = ndpi_community_id_icmp_type_to_code_v6(icmp_type, icmp_code, &icmp_one_way);
     break;
-  case IPPROTO_SCTP:
+  case NDPI_SCTP_PROTOCOL_TYPE:
   case IPPROTO_UDP:
   case IPPROTO_TCP:
     /* src/dst port ok */

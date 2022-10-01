@@ -58,12 +58,7 @@ static void set_ajp_detected(struct ndpi_detection_module_struct *ndpi_struct,
            struct ndpi_flow_struct *flow) {
 
   if(flow->detected_protocol_stack[0] == NDPI_PROTOCOL_UNKNOWN) {
-    ndpi_search_tcp_or_udp(ndpi_struct, flow);
-
-    /* If no custom protocol has been detected */
-    /* if(flow->detected_protocol_stack[0] == NDPI_PROTOCOL_UNKNOWN) */
-      ndpi_int_reset_protocol(flow);
-      ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_AJP, flow->guessed_host_protocol_id);
+      ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_AJP, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
   }
 }
 
@@ -73,7 +68,7 @@ static void set_ajp_detected(struct ndpi_detection_module_struct *ndpi_struct,
 static void ndpi_check_ajp(struct ndpi_detection_module_struct *ndpi_struct,
 			   struct ndpi_flow_struct *flow) {
   struct ajp_header ajp_hdr;
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   if (packet->payload_packet_len < sizeof(ajp_hdr)) {
     NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
@@ -115,15 +110,13 @@ static void ndpi_check_ajp(struct ndpi_detection_module_struct *ndpi_struct,
 void ndpi_search_ajp(struct ndpi_detection_module_struct *ndpi_struct,
  struct ndpi_flow_struct *flow)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;
-
   // Break after 20 packets.
   if(flow->packet_counter > 20) {
     NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
     return;
   }
 
-  if(packet->detected_protocol_stack[0] != NDPI_PROTOCOL_UNKNOWN) {
+  if(flow->detected_protocol_stack[0] != NDPI_PROTOCOL_UNKNOWN) {
     return;
   }
 
@@ -141,7 +134,7 @@ void init_ajp_dissector(struct ndpi_detection_module_struct *ndpi_struct,
 {
   ndpi_set_bitmask_protocol_detection("AJP", ndpi_struct, detection_bitmask,
     *id, NDPI_PROTOCOL_AJP, ndpi_search_ajp,
-    NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD,
+    NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
     SAVE_DETECTION_BITMASK_AS_UNKNOWN,
     ADD_TO_DETECTION_BITMASK);
 

@@ -1,8 +1,8 @@
 /*
  * nest_log_sink.c
  *
- * Copyright (C) 2009-2011 by ipoque GmbH
- * Copyright (C) 2011-20 - ntop.org
+ * Copyright (C) 2009-11 - ipoque GmbH
+ * Copyright (C) 2011-22 - ntop.org
  * Copyright (C) 2018 - eGloo Incorporated
  *
  * This file is part of nDPI, an open source deep packet inspection
@@ -37,7 +37,7 @@ void ndpi_search_nest_log_sink(
         struct ndpi_detection_module_struct *ndpi_struct,
         struct ndpi_flow_struct *flow)
 {
-    struct ndpi_packet_struct *packet = &flow->packet;
+    struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
     NDPI_LOG_DBG(ndpi_struct, "search nest_log_sink\n");
 
@@ -59,7 +59,7 @@ void ndpi_search_nest_log_sink(
 
     if (flow->l4.tcp.nest_log_sink_matches == NEST_LOG_SINK_MIN_MATCH) {
         NDPI_LOG_INFO(ndpi_struct, "found nest_log_sink\n");
-        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_NEST_LOG_SINK, NDPI_PROTOCOL_UNKNOWN);
+        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_NEST_LOG_SINK, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
     }
 }
 
@@ -71,7 +71,7 @@ void init_nest_log_sink_dissector(
             ndpi_struct, detection_bitmask, *id,
             NDPI_PROTOCOL_NEST_LOG_SINK,
             ndpi_search_nest_log_sink,
-            NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD,
+            NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
             SAVE_DETECTION_BITMASK_AS_UNKNOWN,
             ADD_TO_DETECTION_BITMASK);
 

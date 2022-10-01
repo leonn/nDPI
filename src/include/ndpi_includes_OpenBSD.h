@@ -1,7 +1,7 @@
 /*
  * ndpi_includes_OpenBSD.h
  *
- * Copyright (C) 2011-16 - ntop.org
+ * Copyright (C) 2011-22 - ntop.org
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -23,10 +23,6 @@
 
 #ifndef __NDPI_INCLUDES_OPENBSD_H__
 #define __NDPI_INCLUDES_OPENBSD_H__
-
-#ifndef IPPROTO_SCTP
-#define IPPROTO_SCTP 132
-#endif /* IPPROTO_SCTP */
 
 #include <net/bpf.h>
 

@@ -1,7 +1,7 @@
 /*
  * amqp.c
  *
- * Copyright (C) 2011-20 - ntop.org
+ * Copyright (C) 2011-22 - ntop.org
  *
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -36,11 +36,11 @@ struct amqp_header {
 static void ndpi_int_amqp_add_connection(struct ndpi_detection_module_struct *ndpi_struct,
 					 struct ndpi_flow_struct *flow/* , */
 					 /* ndpi_protocol_type_t protocol_type */) {
-	ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_AMQP, NDPI_PROTOCOL_UNKNOWN);
+	ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_AMQP, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
 void ndpi_search_amqp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
-	struct ndpi_packet_struct *packet = &flow->packet;
+	struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
 	NDPI_LOG_DBG(ndpi_struct, "search amqp\n");
 
@@ -78,7 +78,7 @@ void init_amqp_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int
 	ndpi_set_bitmask_protocol_detection("AMQP", ndpi_struct, detection_bitmask, *id,
 					    NDPI_PROTOCOL_AMQP,
 					    ndpi_search_amqp,
-					    NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD,
+					    NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
 					    SAVE_DETECTION_BITMASK_AS_UNKNOWN,
 					    ADD_TO_DETECTION_BITMASK);
 

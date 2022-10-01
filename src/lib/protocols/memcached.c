@@ -1,8 +1,8 @@
 /*
  * memcached.c
  *
- * Copyright (C) 2009-2011 by ipoque GmbH
- * Copyright (C) 2011-20 - ntop.org
+ * Copyright (C) 2009-11 - ipoque GmbH
+ * Copyright (C) 2011-22 - ntop.org
  * Copyright (C) 2018 - eGloo Incorporated
  *
  * This file is part of nDPI, an open source deep packet inspection
@@ -96,14 +96,14 @@ static void ndpi_int_memcached_add_connection(struct ndpi_detection_module_struc
 {
   NDPI_LOG_INFO(ndpi_struct, "found memcached\n");
   ndpi_set_detected_protocol(ndpi_struct, flow,
-			     NDPI_PROTOCOL_MEMCACHED, NDPI_PROTOCOL_UNKNOWN);
+			     NDPI_PROTOCOL_MEMCACHED, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
 void ndpi_search_memcached(
 			   struct ndpi_detection_module_struct *ndpi_struct,
 			   struct ndpi_flow_struct *flow)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   const u_int8_t *offset = packet->payload;
   u_int16_t length = packet->payload_packet_len;
   u_int8_t *matches;
@@ -173,6 +173,8 @@ void ndpi_search_memcached(
 
   if (*matches >= MEMCACHED_MIN_MATCH)
     ndpi_int_memcached_add_connection(ndpi_struct, flow);
+  else if(flow->packet_counter > 5)
+    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);    
 }
 
 void init_memcached_dissector(
@@ -183,7 +185,7 @@ void init_memcached_dissector(
 				      ndpi_struct, detection_bitmask, *id,
 				      NDPI_PROTOCOL_MEMCACHED,
 				      ndpi_search_memcached,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD,
+				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
 				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
 				      ADD_TO_DETECTION_BITMASK);
 

@@ -33,13 +33,13 @@
 static void ndpi_int_dropbox_add_connection(struct ndpi_detection_module_struct *ndpi_struct,
 					    struct ndpi_flow_struct *flow,
 					    u_int8_t due_to_correlation) {
-  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_DROPBOX, NDPI_PROTOCOL_UNKNOWN);
+  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_DROPBOX, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
 
 static void ndpi_check_dropbox(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;  
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   // const u_int8_t *packet_payload = packet->payload;
   u_int32_t payload_len = packet->payload_packet_len;
 
@@ -72,15 +72,11 @@ static void ndpi_check_dropbox(struct ndpi_detection_module_struct *ndpi_struct,
 
 void ndpi_search_dropbox(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;
-
   NDPI_LOG_DBG(ndpi_struct, "search dropbox\n");
 
   /* skip marked packets */
-  if (packet->detected_protocol_stack[0] != NDPI_PROTOCOL_DROPBOX) {
-    if (packet->tcp_retransmission == 0) {
-      ndpi_check_dropbox(ndpi_struct, flow);
-    }
+  if (flow->detected_protocol_stack[0] != NDPI_PROTOCOL_DROPBOX) {
+    ndpi_check_dropbox(ndpi_struct, flow);
   }
 }
 
@@ -90,7 +86,7 @@ void init_dropbox_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_
   ndpi_set_bitmask_protocol_detection("DROPBOX", ndpi_struct, detection_bitmask, *id,
 				      NDPI_PROTOCOL_DROPBOX,
 				      ndpi_search_dropbox,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_UDP_WITH_PAYLOAD,
+				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
 				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
 				      ADD_TO_DETECTION_BITMASK);
   *id += 1;

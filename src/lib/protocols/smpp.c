@@ -2,7 +2,7 @@
  * smpp.c
  * 
  * Copyright (C) 2016 - Damir Franusic <df@release14.org>
- * Copyright (C) 2016-20 - ntop.org
+ * Copyright (C) 2016-22 - ntop.org
  *
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -30,7 +30,7 @@
 static void ndpi_int_smpp_add_connection(struct ndpi_detection_module_struct* ndpi_struct, 
                                          struct ndpi_flow_struct* flow)
 {
-  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SMPP, NDPI_PROTOCOL_UNKNOWN);
+  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SMPP, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
 static  u_int8_t ndpi_check_overflow(u_int32_t current_length, u_int32_t total_lenth)
@@ -41,9 +41,10 @@ static  u_int8_t ndpi_check_overflow(u_int32_t current_length, u_int32_t total_l
 void ndpi_search_smpp_tcp(struct ndpi_detection_module_struct* ndpi_struct, 
                           struct ndpi_flow_struct* flow)
 {
+  struct ndpi_packet_struct* packet = &ndpi_struct->packet;
+
   NDPI_LOG_DBG(ndpi_struct, "search SMPP\n");
-  if (flow->packet.detected_protocol_stack[0] != NDPI_PROTOCOL_SMPP){
-    struct ndpi_packet_struct* packet = &flow->packet;
+  if (flow->detected_protocol_stack[0] != NDPI_PROTOCOL_SMPP){
     // min SMPP packet length = 16 bytes
     if (packet->payload_packet_len < 16) {
       NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
@@ -66,17 +67,21 @@ void ndpi_search_smpp_tcp(struct ndpi_detection_module_struct* ndpi_struct,
       // check if multiple PDUs included
       u_int32_t total_pdu_l = pdu_l;
       u_int32_t tmp_pdu_l = 0;
+#ifdef NDPI_ENABLE_DEBUG_MESSAGES
       u_int16_t pdu_c = 1;
+#endif
       // loop PDUs (check if lengths are valid)
-      while(total_pdu_l < (packet->payload_packet_len-4)) {
+      while(total_pdu_l < ((uint32_t)packet->payload_packet_len-4)) {
 	// get next PDU length
 	tmp_pdu_l = ntohl(get_u_int32_t(packet->payload, total_pdu_l));
 	// if zero or overflowing , return, will try the next TCP segment
 	if(tmp_pdu_l == 0 ||  ndpi_check_overflow(tmp_pdu_l, total_pdu_l) ) return;
 	// inc total PDU length
 	total_pdu_l += ntohl(get_u_int32_t(packet->payload, total_pdu_l));
+#ifdef NDPI_ENABLE_DEBUG_MESSAGES
 	// inc total PDU count
 	++pdu_c;
+#endif
       }
         
       NDPI_LOG_DBG2(ndpi_struct, 

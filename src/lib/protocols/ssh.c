@@ -1,8 +1,8 @@
 /*
  * ssh.c
  *
- * Copyright (C) 2011-20 - ntop.org
- * Copyright (C) 2009-2011 by ipoque GmbH
+ * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2009-11 - ipoque GmbH
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -128,7 +128,7 @@ static void ssh_analyse_cipher(struct ndpi_detection_module_struct *ndpi_struct,
 
   char *rem;
   char *cipher;
-  u_int8_t found_obsolete_cipher = 0;
+  u_int found_obsolete_cipher = 0;
   char *cipher_copy;
   /*
     List of obsolete ciphers can be found at
@@ -161,7 +161,7 @@ static void ssh_analyse_cipher(struct ndpi_detection_module_struct *ndpi_struct,
     
     for(i = 0; obsolete_ciphers[i]; i++) {
       if(strcmp(cipher, obsolete_ciphers[i]) == 0) {
-        found_obsolete_cipher = 1;
+        found_obsolete_cipher = i;
 #ifdef SSH_DEBUG
 	printf("[SSH] [SSH obsolete %s cipher][%s]\n",
 	       is_client_signature ? "client" : "server",
@@ -175,7 +175,12 @@ static void ssh_analyse_cipher(struct ndpi_detection_module_struct *ndpi_struct,
   }
 
   if(found_obsolete_cipher) {
-    NDPI_SET_BIT(flow->risk, (is_client_signature ? NDPI_SSH_OBSOLETE_CLIENT_VERSION_OR_CIPHER : NDPI_SSH_OBSOLETE_SERVER_VERSION_OR_CIPHER));
+    char str[64];
+
+    snprintf(str, sizeof(str), "Found cipher %s", obsolete_ciphers[found_obsolete_cipher]);
+    ndpi_set_risk(ndpi_struct, flow,
+		  (is_client_signature ? NDPI_SSH_OBSOLETE_CLIENT_VERSION_OR_CIPHER : NDPI_SSH_OBSOLETE_SERVER_VERSION_OR_CIPHER),
+		  str);
   }
 
   ndpi_free(cipher_copy);
@@ -204,14 +209,10 @@ static void ndpi_int_ssh_add_connection(struct ndpi_detection_module_struct
   if(flow->extra_packets_func != NULL)
     return;
 
-  flow->guessed_host_protocol_id = flow->guessed_protocol_id = NDPI_PROTOCOL_SSH;
-  
-  /* This is necessary to inform the core to call this dissector again */
-  flow->check_extra_packets = 1;
   flow->max_extra_packets_to_check = 12;
   flow->extra_packets_func = search_ssh_again;
   
-  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SSH, NDPI_PROTOCOL_UNKNOWN);
+  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SSH, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
 /* ************************************************************************ */
@@ -400,14 +401,14 @@ static void ndpi_ssh_zap_cr(char *str, int len) {
 /* ************************************************************************ */
 
 static void ndpi_search_ssh_tcp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
 #ifdef SSH_DEBUG
   printf("[SSH] %s()\n", __FUNCTION__);
 #endif
 
   if(flow->l4.tcp.ssh_stage == 0) {
-    if(packet->payload_packet_len > 7 && packet->payload_packet_len < 100
+    if(packet->payload_packet_len > 7
        && memcmp(packet->payload, "SSH-", 4) == 0) {
       int len = ndpi_min(sizeof(flow->protos.ssh.client_signature)-1, packet->payload_packet_len);
       
@@ -442,7 +443,7 @@ static void ndpi_search_ssh_tcp(struct ndpi_detection_module_struct *ndpi_struct
 #endif
       
       NDPI_LOG_DBG2(ndpi_struct, "ssh stage 1 passed\n");
-      flow->guessed_host_protocol_id = flow->guessed_protocol_id = NDPI_PROTOCOL_SSH;
+      flow->guessed_protocol_id = NDPI_PROTOCOL_SSH;
       
 #ifdef SSH_DEBUG
       printf("[SSH] [completed stage: %u]\n", flow->l4.tcp.ssh_stage);

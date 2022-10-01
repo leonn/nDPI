@@ -31,7 +31,7 @@
 
 
 static void ndpi_int_edonkey_add_connection(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
-  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_EDONKEY, NDPI_PROTOCOL_UNKNOWN);
+  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_EDONKEY, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
 static int ndpi_edonkey_payload_check(const u_int8_t *data, u_int32_t len) {
@@ -156,7 +156,7 @@ static int ndpi_edonkey_payload_check(const u_int8_t *data, u_int32_t len) {
 }
 
 static void ndpi_check_edonkey(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int32_t payload_len = packet->payload_packet_len;
  
   /* Break after 20 packets. */
@@ -165,11 +165,6 @@ static void ndpi_check_edonkey(struct ndpi_detection_module_struct *ndpi_struct,
     return;
   }
 
-  if(payload_len == 0) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
-    return;
-  }
-  
   /* Check if we so far detected the protocol in the request or not. */
   if(flow->edonkey_stage == 0) {
     NDPI_LOG_DBG2(ndpi_struct, "EDONKEY stage 0: \n");
@@ -204,15 +199,11 @@ static void ndpi_check_edonkey(struct ndpi_detection_module_struct *ndpi_struct,
 }
 
 void ndpi_search_edonkey(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
-  struct ndpi_packet_struct *packet = &flow->packet;
-
   NDPI_LOG_DBG(ndpi_struct, "search EDONKEY\n");
 
   /* skip marked packets */
-  if(packet->detected_protocol_stack[0] != NDPI_PROTOCOL_EDONKEY) {
-    if(packet->tcp_retransmission == 0) {
-      ndpi_check_edonkey(ndpi_struct, flow);
-    }
+  if(flow->detected_protocol_stack[0] != NDPI_PROTOCOL_EDONKEY) {
+    ndpi_check_edonkey(ndpi_struct, flow);
   }
 }
 
@@ -222,7 +213,7 @@ void init_edonkey_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_
   ndpi_set_bitmask_protocol_detection("eDonkey", ndpi_struct, detection_bitmask, *id,
 				      NDPI_PROTOCOL_EDONKEY,
 				      ndpi_search_edonkey,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITHOUT_RETRANSMISSION,
+				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
 				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
 				      ADD_TO_DETECTION_BITMASK);
 

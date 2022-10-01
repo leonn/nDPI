@@ -32,12 +32,12 @@
 
 static void ndpi_int_rtmp_add_connection(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_RTMP, NDPI_PROTOCOL_UNKNOWN);
+  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_RTMP, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
 static void ndpi_check_rtmp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;  
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int32_t payload_len = packet->payload_packet_len;
   
   /* Break after 20 packets. */
@@ -78,15 +78,11 @@ static void ndpi_check_rtmp(struct ndpi_detection_module_struct *ndpi_struct, st
 
 void ndpi_search_rtmp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;
-
   NDPI_LOG_DBG(ndpi_struct, "search RTMP\n");
 
   /* skip marked packets */
-  if (packet->detected_protocol_stack[0] != NDPI_PROTOCOL_RTMP) {
-    if (packet->tcp_retransmission == 0) {
-      ndpi_check_rtmp(ndpi_struct, flow);
-    }
+  if (flow->detected_protocol_stack[0] != NDPI_PROTOCOL_RTMP) {
+    ndpi_check_rtmp(ndpi_struct, flow);
   }
 }
 

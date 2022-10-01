@@ -33,7 +33,7 @@ struct tpkt {
 
 void ndpi_search_h323(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int16_t dport = 0, sport = 0;
 
   NDPI_LOG_DBG(ndpi_struct, "search H323\n");
@@ -46,7 +46,7 @@ void ndpi_search_h323(struct ndpi_detection_module_struct *ndpi_struct, struct n
     NDPI_LOG_DBG2(ndpi_struct, "calculated dport over tcp\n");
 
     /* H323  */
-    if(packet->payload_packet_len > 4
+    if(packet->payload_packet_len > 5
        && (packet->payload[0] == 0x03)
        && (packet->payload[1] == 0x00)) {
       struct tpkt *t = (struct tpkt*)packet->payload;
@@ -63,7 +63,7 @@ void ndpi_search_h323(struct ndpi_detection_module_struct *ndpi_struct, struct n
 	  if((packet->payload[5] == 0xE0 /* CC Connect Request */)
 	     || (packet->payload[5] == 0xD0 /* CC Connect Confirm */)) {
 	    NDPI_LOG_INFO(ndpi_struct, "found RDP\n");
-	    ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_RDP, NDPI_PROTOCOL_UNKNOWN);
+	    ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_RDP, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 	    return;
 	  }
 	}
@@ -72,7 +72,7 @@ void ndpi_search_h323(struct ndpi_detection_module_struct *ndpi_struct, struct n
 
 	if(flow->l4.tcp.h323_valid_packets >= 2) {
 	  NDPI_LOG_INFO(ndpi_struct, "found H323 broadcast\n");
-	  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_H323, NDPI_PROTOCOL_UNKNOWN);
+	  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_H323, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 	}
       } else {
 	/* This is not H.323 */
@@ -89,22 +89,22 @@ void ndpi_search_h323(struct ndpi_detection_module_struct *ndpi_struct, struct n
        packet->payload[4] == 0x00 && packet->payload[5] == 0x00)
       {
 	NDPI_LOG_INFO(ndpi_struct, "found H323 broadcast\n");
-	ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_H323, NDPI_PROTOCOL_UNKNOWN);
+	ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_H323, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 	return;
       }
     /* H323  */
     if(sport == 1719 || dport == 1719) {
-      if((packet->payload_packet_len >= 5)
+      if((packet->payload_packet_len > 5)
 	 && (packet->payload[0] == 0x16)
 	 && (packet->payload[1] == 0x80)
 	 && (packet->payload[4] == 0x06)
 	 && (packet->payload[5] == 0x00)) {
 	NDPI_LOG_INFO(ndpi_struct, "found H323 broadcast\n");
-	ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_H323, NDPI_PROTOCOL_UNKNOWN);
+	ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_H323, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 	return;
       } else if(packet->payload_packet_len >= 20 && packet->payload_packet_len <= 117) {
 	NDPI_LOG_INFO(ndpi_struct, "found H323 broadcast\n");
-	ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_H323, NDPI_PROTOCOL_UNKNOWN);
+	ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_H323, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 	return;
       } else {
 	NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
@@ -122,7 +122,7 @@ void init_h323_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int
   ndpi_set_bitmask_protocol_detection("H323", ndpi_struct, detection_bitmask, *id,
 				      NDPI_PROTOCOL_H323,
 				      ndpi_search_h323,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_TCP_OR_UDP_WITH_PAYLOAD,
+				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
 				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
 				      ADD_TO_DETECTION_BITMASK);
 

@@ -1,8 +1,8 @@
 /*
  * thunder.c
  *
- * Copyright (C) 2009-2011 by ipoque GmbH
- * Copyright (C) 2011-20 - ntop.org
+ * Copyright (C) 2009-11 - ipoque GmbH
+ * Copyright (C) 2011-22 - ntop.org
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -32,18 +32,7 @@
 static void ndpi_int_thunder_add_connection(struct ndpi_detection_module_struct *ndpi_struct, 
 					    struct ndpi_flow_struct *flow/* , ndpi_protocol_type_t protocol_type */)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;
-  struct ndpi_id_struct *src = flow->src;
-  struct ndpi_id_struct *dst = flow->dst;
-
-  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_THUNDER, NDPI_PROTOCOL_UNKNOWN);
-
-  if (src != NULL) {
-    src->thunder_ts = packet->current_time_ms;
-  }
-  if (dst != NULL) {
-    dst->thunder_ts = packet->current_time_ms;
-  }
+  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_THUNDER, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
 
@@ -58,7 +47,7 @@ __forceinline static
 void ndpi_int_search_thunder_udp(struct ndpi_detection_module_struct
 				 *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 	
   if (packet->payload_packet_len > 8 && packet->payload[0] >= 0x30
       && packet->payload[0] < 0x40 && packet->payload[1] == 0 && packet->payload[2] == 0 && packet->payload[3] == 0) {
@@ -89,7 +78,7 @@ __forceinline static
 void ndpi_int_search_thunder_tcp(struct ndpi_detection_module_struct
 				 *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 	
   if (packet->payload_packet_len > 8 && packet->payload[0] >= 0x30
       && packet->payload[0] < 0x40 && packet->payload[1] == 0 && packet->payload[2] == 0 && packet->payload[3] == 0) {
@@ -145,28 +134,10 @@ __forceinline static
 void ndpi_int_search_thunder_http(struct ndpi_detection_module_struct
 				  *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;
-  struct ndpi_id_struct *src = flow->src;
-  struct ndpi_id_struct *dst = flow->dst;
-
-
-  if (packet->detected_protocol_stack[0] == NDPI_PROTOCOL_THUNDER) {
-    if (src != NULL && ((u_int32_t)
-			(packet->current_time_ms - src->thunder_ts) < ndpi_struct->thunder_timeout)) {
-      NDPI_LOG_DBG2(ndpi_struct,
-	       "thunder : save src connection packet detected\n");
-      src->thunder_ts = packet->current_time_ms;
-    } else if (dst != NULL && ((u_int32_t)
-			       (packet->current_time_ms - dst->thunder_ts) < ndpi_struct->thunder_timeout)) {
-      NDPI_LOG_DBG2(ndpi_struct,
-	       "thunder : save dst connection packet detected\n");
-      dst->thunder_ts = packet->current_time_ms;
-    }
-    return;
-  }
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   if (packet->payload_packet_len > 5
-      && memcmp(packet->payload, "GET /", 5) == 0 && NDPI_SRC_OR_DST_HAS_PROTOCOL(src, dst, NDPI_PROTOCOL_THUNDER)) {
+      && memcmp(packet->payload, "GET /", 5) == 0) {
     NDPI_LOG_DBG2(ndpi_struct, "HTTP packet detected\n");
     ndpi_parse_packet_line_info(ndpi_struct, flow);
 
@@ -195,7 +166,7 @@ void ndpi_int_search_thunder_http(struct ndpi_detection_module_struct
 
 void ndpi_search_thunder(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   //
   //struct ndpi_id_struct *src = flow->src;
   //struct ndpi_id_struct *dst = flow->dst;

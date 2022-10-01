@@ -1,5 +1,316 @@
 # CHANGELOG
 
+#### nDPI 4.4 (July 2022)
+
+## New Features
+ - Add risk information that describes why a specific risk was triggered also providing metadata
+ - Added API call ndpi_check_flow_risk_exceptions() for handling risk exceptions
+ - Split protocols in: network (e.g. TLS) and application protocols (e.g. Google)
+ - Extended confidence level with two new values (NDPI_CONFIDENCE_DPI_PARTIAL and NDPI_CONFIDENCE_DPI_PARTIAL_CACHE)
+ - Added ndpi_get_flow_error_code() API call
+
+## New Supported Protocols and Services
+ - Add protocol detection for:
+   - UltraSurf
+   - i3D
+   - RiotGames
+   - TSAN
+   - TunnelBear VPN
+   - collectd
+   - PIM (Protocol Indipendent Multicast)
+   - Pragmatic General Multicast (PGM)
+   - RSH
+   - GoTo products (mainly GoToMeeting)
+   - Dazn
+   - MPEG-DASH
+   - Agora Software Defined Real-time Network (SD-RTN)
+   - Toca Boca
+   - VXLAN
+   - MDNS/LLMNR
+
+## Improvements
+ - Improve protocol detection for:
+   - SMTP/SMTPS now supports STARTTLS
+   - OCSP
+   - TargusDataspeed
+   - Usenet
+   - DTLS (added support for old versions)
+   - TFTP
+   - SOAP via HTTP
+   - GenshinImpact
+   - IPSec/ISAKMP
+   - DNS
+   - syslog
+   - DHCP (various bug fixes and improvements)
+   - NATS
+   - Viber
+   - Xiaomi
+   - Raknet
+   - gnutella
+   - Kerberos
+   - QUIC (Added support for v2drft 01)
+   - SSDP
+   - SNMP
+ - Improved DGA detection
+ - Improved AES-NI check
+ - Add flow risk:
+   - NDPI_PUNYCODE_IDN
+   - NDPI_ERROR_CODE_DETECTED
+   - NDPI_HTTP_CRAWLER_BOT
+   - NDPI_ANONYMOUS_SUBSCRIBER
+   - NDPI_UNIDIRECTIONAL_TRAFFIC
+
+## Changes
+ - Added support for 64 bit bins
+ - Added Cloudflare WARP detection patterns
+ - Renamed Z39.50 -> Z3950
+ - Replaced nDPI's internal hashmap with uthash
+ - Reimplemented 1kxun application protoco
+ - Renamed SkypeCall to Skype_TeamsCall
+ - Updated Python Bindings
+ - Unless --with-libgcrypt is used, nDPI now uses its internal gcrypt implementation
+
+## Fixes
+ - Fixes for some protocol classification families
+ - Fixed default protocol ports for email protocols
+ - Various memory and overflow fixes
+ - Disabled various risks for specific protocols (e.g. disable missing ALPN for CiscoVPN)
+ - Fix TZSP decapsulation
+
+## Misc
+ - Update ASN/IPs lists
+ - Improved code profiling
+ - Use Doxygen to generate the API documentation
+ - Added Edgecast and Cachefly CDNs.
+
+#### nDPI 4.2 (Feb 2022)
+
+## New Features
+ - Add a "confidence" field indicating the reliability of the classification
+ - Add risk exceptions for services and domain names via ndpi_add_domain_risk_exceptions()
+ - Add ability to report whether a protocol is encrypted
+
+## New Supported Protocols and Services
+ - Add protocol detection for:
+   - Badoo
+   - Cassandra
+   - EthernetIP
+
+## Improvements
+ - Reduce memory footprint
+ - Improve protocol detection for:
+   - BitTorrent
+   - ICloud Private Relay
+   - IMAP, POP3, SMTP
+   - Log4J/Log4Shell
+   - Microsoft Azure
+   - Pandora TV
+   - RTP
+   - RTSP
+   - Salesforce
+   - STUN
+   - Whatsapp
+   - QUICv2
+   - Zoom
+ - Add flow risk:
+   - NDPI_CLEAR_TEXT_CREDENTIALS
+   - NDPI_POSSIBLE_EXPLOIT (Log4J)
+   - NDPI_TLS_FATAL_ALERT
+   - NDPI_TLS_CERTIFICATE_ABOUT_TO_EXPIRE
+ - Update WhatsAPP and Instagram addresses
+ - Update the list of default ports for QUIC
+ - Update WindowsUpdate URLs 
+ - Add support for the .goog Google TLD
+ - Add googletagmanager.com
+ - Add bitmaps and API for handling compressed bitmaps
+ - Add JA3 in risk exceptions
+ - Add entropy calculation to check for suspicious (encrypted) payload
+ - Add extraction of hostname in SMTP
+ - Add RDP over UDP dissection
+ - Add support for TLS over IPV6 in Subject Alt Names field
+ - Improve JSON and CSV serialization
+ - Improve IPv6 support for almost all dissectors
+ - Improve CI and unit tests, add arm64, armhf and s390x as part of CI
+ - Improve WHOIS detection, reduce false positives
+ - Improve DGA detection for skipping potential DGAs of known/popular domain names
+ - Improve user agent analysis
+ - Reworked HTTP protocol dissection including HTTP proxy and HTTP connect
+
+## Changes
+ - TLS obsolete protocol is set when TLS < 1.2 (used to be 1.1)
+ - Numeric IPs are not considered for DGA checks
+ - Differentiate between standard Amazon stuff (i.e market) and AWS
+ - Remove Playstation VUE protocol
+ - Remove pandora.tv from Pandora protocol
+ - Remove outdated SoulSeek dissector
+
+## Fixes
+ - Fix race conditions
+ - Fix dissectors to be big-endian friendly
+ - Fix heap overflow in realloc wrapper
+ - Fix errors in Kerberos, TLS, H323, Netbios, CSGO, Bittorrent
+ - Fix wrong tuple comparison
+ - Fix ndpi_serialize_string_int64
+ - Fix Grease values parsing
+ - Fix certificate mismatch check
+ - Fix null-dereference read for Zattoo with IPv6
+ - Fix dissectors initialization for XBox, Diameter
+ - Fix confidence for STUN classifications
+ - Fix FreeBSD support
+ - Fix old GQUIC versions on big-endian machines
+ - Fix aho-corasick on big-endian machines
+ - Fix DGA false positive
+ - Fix integer overflow for QUIC
+ - Fix HTTP false positives
+ - Fix SonarCloud-CI support
+ - Fix clashes setting the hostname on similar protocols (FTP, SMTP)
+ - Fix some invalid TLS guesses
+ - Fix crash on ARM (Raspberry)
+ - Fix DNS (including fragmented DNS) dissection
+ - Fix parsing of IPv6 packets with extension headers
+ - Fix extraction of Realm attribute in STUN
+ - Fix support for START-TLS sessions in FTP
+ - Fix TCP retransmissions for multiple dissectors
+ - Fix DES initialisation
+ - Fix Git protocol dissection
+ - Fix certificate mismatch for TLS flows with no client hello observed
+ - Fix old versions of GQUIC on big-endian machines
+
+## Misc
+ - Add tool for generating automatically the Azure IP list
+
+#### nDPI 4.0 (July 2021)
+
+## New Features
+ - Add API for computing RSI (Relative Strenght Index)
+ - Add GeoIP support
+ - Add fragments management
+ - Add API for jitter calculation
+ - Add single exponential smoothing API
+ - Add timeseries forecasting support implementing Holt-Winters with confidence interval
+ - Add support for MAC to radi tree and expose the full API to applications
+ - Add JA3+, with ALPN and elliptic curve
+ - Add double exponential smoothing implementation
+ - Extended API for managing flow risks
+ - Add flow risk score
+ - New flow risks:
+   - Desktop or File Sharing Session
+   - HTTP suspicious content (useful for tracking trickbot)
+   - Malicious JA3
+   - Malicious SHA1
+   - Risky domain
+   - Risky AS
+   - TLS Certificate Validity Too Long
+   - TLS Suspicious Extension
+
+## New Supported Protocols and Services
+ - New protocols:
+   - AmongUs
+   - AVAST SecureDNS
+   - CPHA (CheckPoint High Availability Protocol)
+   - DisneyPlus
+   - DTLS
+   - Genshin Impact
+   - HP Virtual Machine Group Management (hpvirtgrp)
+   - Mongodb
+   - Pinterest
+   - Reddit
+   - Snapchat VoIP calls
+   - Tumblr
+   - Virtual Asssitant (Alexa, Siri)
+   - Z39.50
+ - Add protocols to HTTP as subprotocols
+ - Add detection of TLS browser type
+ - Add connectionless DCE/RPC detection
+
+## Improvements
+   - 2.5x speed bump. Example ndpiReader with a long mixed pcap
+	v3.4 - nDPI throughput:       1.29 M pps / 3.35 Gb/sec
+	v4.0 - nDPI throughput:       3.35 M pps / 8.68 Gb/sec
+  - Improve detection/dissection of:
+   - AnyDesk
+   - DNS
+   - Hulu
+   - DCE/RPC (avoid false positives)
+   - dnscrypt
+   - Facebook (add new networks)
+   - Fortigate
+   - FTP Control
+   - HTTP
+     - Fix user-agent parsing
+     - Fix logs when NDPI_ENABLE_DEBUG_MESSAGES is defined
+   - IEC104
+   - IEC60870
+   - IRC
+   - Netbios
+   - Netflix
+   - Ookla speedtest (detection over IPv6)
+   - openspeedtest.com
+   - Outlook / MicrosoftMail
+   - QUIC
+     - update to draft-33
+     - improve handling of SNI
+     - support for fragmented Client Hello
+     - support for DNS-over-QUIC
+   - RTSP
+   - RTSP via HTTP
+   - SNMP (reimplemented)
+   - Skype
+   - SSH
+   - Steam (Steam Datagram Relay - SDR)
+   - STUN (avoid false positives, improved Skype detection)
+   - TeamViewer (add new hosts)
+   - TOR (update hosts)
+   - TLS
+     - Certificate Subject matching
+     - Check for common ALPNs
+     - Reworked fingerprint calculation
+     - Fix extraction for TLS signature algorithms
+     - Fix ClientHello parsing
+   - UPnP
+   - wireguard
+ - Improve DGA detection
+ - Improve JA3
+ - Improve Mining detection
+ - Improve string matching algorithm
+ - Improve ndpi_pref_enable_tls_block_dissection
+ - Optimize speed and memory size
+ - Update ahocorasick library
+ - Improve subprotocols detection
+
+## Fixes
+ - Fix partial application matching
+ - Fix multiple segfault and leaks
+ - Fix uninitialized memory use
+ - Fix release of patterns allocated in ndpi_add_string_to_automa
+ - Fix return value of ndpi_match_string_subprotocol
+ - Fix setting of flow risks on 32 bit machines
+ - Fix TLS certificate threshold
+ - Fix a memory error in TLS JA3 code
+ - Fix false positives in Z39.50
+ - Fix off-by-one memory error for TLS-JA3
+ - Fix bug in ndpi_lru_find_cache
+ - Fix invalid xbox and playstation port guesses
+ - Fix CAPWAP tunnel decoding
+ - Fix parsing of DLT_PPP datalink type
+ - Fix dissection of QUIC initial packets coalesced with 0-RTT one
+ - Fix parsing of GTP headers
+ - Add bitmap boundary checks
+
+## Misc
+ - Update download category name
+ - Update category labels
+ - Renamed Skype in Skype_Teams (the protocol is now shared across these apps)
+ - Add IEC analysis wireshark plugin
+ - Flow risk visualization in Wireshark
+ - ndpiReader
+   - add statistics about nDPI performance
+   - fix memory leak
+   - fix collecting of risks statistics
+ - Move installed libraries from /usr/local to /usr
+ - Improve NDPI_API_VERSION generation
+ - Update ndpi_ptree_match_addr prototype
+
 #### nDPI 3.4 (October 2020)
 
 ## New Features

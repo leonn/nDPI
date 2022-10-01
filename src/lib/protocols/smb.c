@@ -1,7 +1,7 @@
 /*
  * smb.c
  *
- * Copyright (C) 2016-20 - ntop.org
+ * Copyright (C) 2016-22 - ntop.org
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -27,7 +27,7 @@
 
 void ndpi_search_smb_tcp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   NDPI_LOG_DBG(ndpi_struct, "search SMB\n");
 
@@ -37,26 +37,34 @@ void ndpi_search_smb_tcp(struct ndpi_detection_module_struct *ndpi_struct, struc
     
     if(((packet->tcp->dest == fourfourfive) || (packet->tcp->source == fourfourfive))
        && packet->payload_packet_len > (32 + 4 + 4)
-       && (packet->payload_packet_len - 4) == ntohl(get_u_int32_t(packet->payload, 0))
-       ) {
-      u_int8_t smbv1[] = { 0xff, 0x53, 0x4d, 0x42 };
+       && packet->payload[0] == 0x00) {
+      u_int32_t length;
 
-      NDPI_LOG_INFO(ndpi_struct, "found SMB\n");
+      length = (packet->payload[1] << 16) + (packet->payload[2] << 8) + packet->payload[3];
+      /* If the message is split into multiple TCP segments, let's hope that
+         the first message we receive is the first segment */
+      if(length >= (uint32_t)packet->payload_packet_len - 4) {
+        u_int8_t smbv1[] = { 0xff, 0x53, 0x4d, 0x42 };
+        u_int8_t smbv2[] = { 0xfe, 0x53, 0x4d, 0x42 };
 
-      if(memcmp(&packet->payload[4], smbv1, sizeof(smbv1)) == 0) {
-	if(packet->payload[8] != 0x72) /* Skip Negotiate request */ {	  
-	  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SMBV1, NDPI_PROTOCOL_NETBIOS);
-	  NDPI_SET_BIT(flow->risk, NDPI_SMB_INSECURE_VERSION);
-	}
-      } else
-	ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SMBV23, NDPI_PROTOCOL_NETBIOS);
-
-      return;
+        if(memcmp(&packet->payload[4], smbv1, sizeof(smbv1)) == 0) {
+          if(packet->payload[8] != 0x72) /* Skip Negotiate request */ {
+            NDPI_LOG_INFO(ndpi_struct, "found SMBv1\n");
+            ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SMBV1, NDPI_PROTOCOL_NETBIOS, NDPI_CONFIDENCE_DPI);
+            ndpi_set_risk(ndpi_struct, flow, NDPI_SMB_INSECURE_VERSION, "Found SMBv1");
+          }
+          return;
+        } else if(memcmp(&packet->payload[4], smbv2, sizeof(smbv2)) == 0) {
+          NDPI_LOG_INFO(ndpi_struct, "found SMBv23\n");
+          ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SMBV23, NDPI_PROTOCOL_NETBIOS, NDPI_CONFIDENCE_DPI);
+          return;
+        }
+      }
     }
   }
 
-  ndpi_exclude_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SMBV1, __FILE__, __FUNCTION__, __LINE__);
-  ndpi_exclude_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SMBV23, __FILE__, __FUNCTION__, __LINE__);
+  NDPI_EXCLUDE_PROTO_EXT(ndpi_struct, flow, NDPI_PROTOCOL_SMBV1);
+  NDPI_EXCLUDE_PROTO_EXT(ndpi_struct, flow, NDPI_PROTOCOL_SMBV23);
 }
 
 

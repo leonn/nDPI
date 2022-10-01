@@ -1,7 +1,7 @@
 /*
  * ppstream.c
  *
- * Copyright (C) 2016-20 - ntop.org
+ * Copyright (C) 2016-22 - ntop.org
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -33,7 +33,7 @@
 static void ndpi_int_ppstream_add_connection(struct ndpi_detection_module_struct
 					     *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_PPSTREAM, NDPI_PROTOCOL_UNKNOWN);
+  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_PPSTREAM, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
   NDPI_LOG_INFO(ndpi_struct, "found PPStream over UDP\n");
 }
 
@@ -41,7 +41,7 @@ static void ndpi_int_ppstream_add_connection(struct ndpi_detection_module_struct
 void ndpi_search_ppstream(struct ndpi_detection_module_struct
 			  *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  struct ndpi_packet_struct *packet = &flow->packet;
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   NDPI_LOG_DBG(ndpi_struct, "search PPStream\n");
   /**
@@ -51,7 +51,7 @@ void ndpi_search_ppstream(struct ndpi_detection_module_struct
   /* check PPS over UDP */
   if(packet->udp != NULL) {
     /*** on port 17788 ***/
-    if(packet->payload_packet_len > 12 && ((ntohs(packet->udp->source) == PPS_PORT) || (ntohs(packet->udp->dest) == PPS_PORT))) {
+    if(packet->payload_packet_len > 14 && ((ntohs(packet->udp->source) == PPS_PORT) || (ntohs(packet->udp->dest) == PPS_PORT))) {
       if(((packet->payload_packet_len - 4 == get_l16(packet->payload, 0))
 	  || (packet->payload_packet_len == get_l16(packet->payload, 0))
 	  || (packet->payload_packet_len >= 6 && packet->payload_packet_len - 6 == get_l16(packet->payload, 0)))) {
@@ -228,7 +228,7 @@ void init_ppstream_dissector(struct ndpi_detection_module_struct *ndpi_struct, u
   ndpi_set_bitmask_protocol_detection("PPStream", ndpi_struct, detection_bitmask, *id,
 				      NDPI_PROTOCOL_PPSTREAM,
 				      ndpi_search_ppstream,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD,
+				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
 				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
 				      ADD_TO_DETECTION_BITMASK);
   
