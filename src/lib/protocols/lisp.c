@@ -23,13 +23,13 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_LISP
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 #define LISP_PORT  4341 /* Only UDP */
 #define LISP_PORT1 4342 /* TCP and UDP */
 
 static void ndpi_int_lisp_add_connection(struct ndpi_detection_module_struct *ndpi_struct,
-					    struct ndpi_flow_struct *flow,
-					    u_int8_t due_to_correlation)
+					    struct ndpi_flow_struct *flow)
 {
 
   ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_LISP, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
@@ -46,7 +46,7 @@ static void ndpi_check_lisp(struct ndpi_detection_module_struct *ndpi_struct, st
     if((packet->udp->source == lisp_port && packet->udp->dest == lisp_port) ||
        (packet->udp->source == lisp_port1 && packet->udp->dest == lisp_port1)) {
       NDPI_LOG_INFO(ndpi_struct, "found lisp\n");
-      ndpi_int_lisp_add_connection(ndpi_struct, flow, 0);
+      ndpi_int_lisp_add_connection(ndpi_struct, flow);
       return;
     }
   } else {
@@ -62,37 +62,29 @@ static void ndpi_check_lisp(struct ndpi_detection_module_struct *ndpi_struct, st
 	   packet->payload[packet->payload_packet_len - 3] == 0xAC &&
 	   packet->payload[packet->payload_packet_len - 4] == 0x9F) {
 	  NDPI_LOG_INFO(ndpi_struct, "found lisp\n");
-	  ndpi_int_lisp_add_connection(ndpi_struct, flow, 0);
+	  ndpi_int_lisp_add_connection(ndpi_struct, flow);
           return;
 	}
       }
     }
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
-void ndpi_search_lisp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_lisp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   NDPI_LOG_DBG(ndpi_struct, "search lisp\n");
 
-  /* skip marked packets */
-  if (flow->detected_protocol_stack[0] != NDPI_PROTOCOL_LISP) {
- 
-      ndpi_check_lisp(ndpi_struct, flow);
-   
-  }
+  ndpi_check_lisp(ndpi_struct, flow);
 }
 
 
-void init_lisp_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask) 
+void init_lisp_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("LISP", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_LISP,
-				      ndpi_search_lisp,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-  *id += 1;
+  register_dissector("LISP", ndpi_struct,
+                     ndpi_search_lisp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                      1, NDPI_PROTOCOL_LISP);
 }
 

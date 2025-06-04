@@ -1,7 +1,7 @@
 /*
  * telnet.c
  *
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  * Copyright (C) 2009-11 - ipoque GmbH
  *
  * This file is part of nDPI, an open source deep packet inspection
@@ -28,6 +28,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_TELNET
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 /* #define TELNET_DEBUG 1 */
 
@@ -145,8 +146,7 @@ __mingw_forceinline static
 #else
 __forceinline static
 #endif
-u_int8_t search_iac(struct ndpi_detection_module_struct *ndpi_struct,
-		    struct ndpi_flow_struct *flow) {
+u_int8_t search_iac(struct ndpi_detection_module_struct *ndpi_struct) {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   u_int16_t a;
@@ -184,11 +184,11 @@ u_int8_t search_iac(struct ndpi_detection_module_struct *ndpi_struct,
 /* ************************************************************************ */
 
 /* this detection also works asymmetrically */
-void ndpi_search_telnet_tcp(struct ndpi_detection_module_struct *ndpi_struct,
-			    struct ndpi_flow_struct *flow) {
+static void ndpi_search_telnet_tcp(struct ndpi_detection_module_struct *ndpi_struct,
+				   struct ndpi_flow_struct *flow) {
   NDPI_LOG_DBG(ndpi_struct, "search telnet\n");
 
-  if(search_iac(ndpi_struct, flow) == 1) {
+  if(search_iac(ndpi_struct) == 1) {
     if(flow->l4.tcp.telnet_stage == 2) {
       NDPI_LOG_INFO(ndpi_struct, "found telnet\n");
       ndpi_int_telnet_add_connection(ndpi_struct, flow);
@@ -209,20 +209,17 @@ void ndpi_search_telnet_tcp(struct ndpi_detection_module_struct *ndpi_struct,
 #ifdef TELNET_DEBUG
     printf("==> [%s:%d] %s()\n", __FILE__, __LINE__, __FUNCTION__);
 #endif
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
   }
   
   return;
 }
 
 
-void init_telnet_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_telnet_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("Telnet", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_TELNET,
-				      ndpi_search_telnet_tcp,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-  *id += 1;
+  register_dissector("Telnet", ndpi_struct,
+                     ndpi_search_telnet_tcp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_TELNET);
 }

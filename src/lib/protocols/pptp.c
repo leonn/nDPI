@@ -2,7 +2,7 @@
  * pptp.c
  *
  * Copyright (C) 2009-11 - ipoque GmbH
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -27,6 +27,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_PPTP
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static void ndpi_int_pptp_add_connection(struct ndpi_detection_module_struct
 										   *ndpi_struct, struct ndpi_flow_struct *flow)
@@ -34,8 +35,8 @@ static void ndpi_int_pptp_add_connection(struct ndpi_detection_module_struct
   ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_PPTP, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
-void ndpi_search_pptp(struct ndpi_detection_module_struct
-						*ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_pptp(struct ndpi_detection_module_struct
+			     *ndpi_struct, struct ndpi_flow_struct *flow)
 {
 	struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 	
@@ -52,18 +53,14 @@ void ndpi_search_pptp(struct ndpi_detection_module_struct
 		return;
 	}
 
-	NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+	NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 
-void init_pptp_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_pptp_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("PPTP", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_PPTP,
-				      ndpi_search_pptp,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("PPTP", ndpi_struct,
+                     ndpi_search_pptp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_PPTP);
 }

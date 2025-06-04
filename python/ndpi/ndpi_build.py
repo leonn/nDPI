@@ -30,9 +30,6 @@ void ndpi_py_setup_detection_module(struct ndpi_detection_module_struct *mod) {
   if (mod == NULL) {
     return;
   } else {
-    NDPI_PROTOCOL_BITMASK protos;
-    NDPI_BITMASK_SET_ALL(protos); // Set bitmask for ALL protocols
-    ndpi_set_protocol_detection_bitmask2(mod, &protos);
     ndpi_finalize_initialization(mod);
   }
 };
@@ -49,7 +46,7 @@ struct ndpi_flow_struct * ndpi_py_initialize_flow(void) {
 NDPI_APIS = """
 u_int16_t ndpi_get_api_version(void);
 char* ndpi_revision(void);
-struct ndpi_detection_module_struct *ndpi_init_detection_module(ndpi_init_prefs prefs);
+struct ndpi_detection_module_struct *ndpi_init_detection_module(struct ndpi_global_context *g_ctx);
 void ndpi_exit_detection_module(struct ndpi_detection_module_struct *ndpi_struct);
 void ndpi_flow_free(void *ptr);
 ndpi_protocol ndpi_detection_process_packet(struct ndpi_detection_module_struct *ndpi_struct,
@@ -57,10 +54,9 @@ ndpi_protocol ndpi_detection_process_packet(struct ndpi_detection_module_struct 
                                             const unsigned char *packet,
                                             const unsigned short packetlen,
                                             const u_int64_t packet_time_ms,
-                                            const struct ndpi_flow_input_info *input_info);
+                                            struct ndpi_flow_input_info *input_info);
 ndpi_protocol ndpi_detection_giveup(struct ndpi_detection_module_struct *ndpi_struct,
                                     struct ndpi_flow_struct *flow,
-                                    u_int8_t enable_guess,
                                     u_int8_t *protocol_was_guessed);
 void ndpi_py_setup_detection_module(struct ndpi_detection_module_struct *mod);
 struct ndpi_flow_struct * ndpi_py_initialize_flow(void);
@@ -91,9 +87,6 @@ NDPI_CDEF = subprocess.run(["gcc",
                            ).stdout.decode('utf-8',
                                            errors='ignore')
 
-NDPI_MODULE_STRUCT_CDEF = NDPI_CDEF.split("//CFFI.NDPI_MODULE_STRUCT")[1]
-
-
 NDPI_PACKED = subprocess.run(["gcc",
                               "-DNDPI_LIB_COMPILATION", "-DNDPI_CFFI_PREPROCESSING",
                               "-E", "-x", "c", "-P", "-C",
@@ -104,7 +97,7 @@ NDPI_PACKED = subprocess.run(["gcc",
 
 NDPI_PACKED_STRUCTURES = NDPI_PACKED.split("//CFFI.NDPI_PACKED_STRUCTURES")[1]
 
-NDPI_SOURCE = NDPI_INCLUDES + NDPI_MODULE_STRUCT_CDEF + NDPI_HELPERS
+NDPI_SOURCE = NDPI_INCLUDES + NDPI_HELPERS
 
 
 ffi_builder.set_source("_ndpi",

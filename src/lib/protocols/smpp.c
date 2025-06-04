@@ -25,6 +25,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_SMPP
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 
 static void ndpi_int_smpp_add_connection(struct ndpi_detection_module_struct* ndpi_struct, 
@@ -38,8 +39,8 @@ static  u_int8_t ndpi_check_overflow(u_int32_t current_length, u_int32_t total_l
     return (current_length > 0 && current_length > INT_MAX - total_lenth);
 }
 
-void ndpi_search_smpp_tcp(struct ndpi_detection_module_struct* ndpi_struct, 
-                          struct ndpi_flow_struct* flow)
+static void ndpi_search_smpp_tcp(struct ndpi_detection_module_struct* ndpi_struct,
+                                 struct ndpi_flow_struct* flow)
 {
   struct ndpi_packet_struct* packet = &ndpi_struct->packet;
 
@@ -47,7 +48,7 @@ void ndpi_search_smpp_tcp(struct ndpi_detection_module_struct* ndpi_struct,
   if (flow->detected_protocol_stack[0] != NDPI_PROTOCOL_SMPP){
     // min SMPP packet length = 16 bytes
     if (packet->payload_packet_len < 16) {
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       return;
     }
     // get PDU length
@@ -59,7 +60,7 @@ void ndpi_search_smpp_tcp(struct ndpi_detection_module_struct* ndpi_struct,
 
     // if PDU size was invalid, try the following TCP segments, 3 attempts max
     if(flow->packet_counter > 3) {
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       return;
     }
     // verify PDU length
@@ -99,13 +100,13 @@ void ndpi_search_smpp_tcp(struct ndpi_detection_module_struct* ndpi_struct,
     u_int32_t pdu_type = ntohl(get_u_int32_t(packet->payload, 4));
     // first byte of PDU type is either 0x00 of 0x80
     if(!(packet->payload[4] == 0x00 || packet->payload[4] == 0x80)) {
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       return;
     }
     // remove 0x80, get request type pdu
     u_int32_t pdu_req = pdu_type & 0x00FFFFFF;
     // list of known PDU types
-    if((pdu_req >  0x00000000 && pdu_req <= 0x00000009) ||
+    if((pdu_req <= 0x00000009) || /* [0-9] */
        (pdu_req == 0x0000000B || pdu_req == 0x00000015  ||
         pdu_req == 0x00000021 || pdu_req == 0x00000102  ||
         pdu_req == 0x00000103)){
@@ -304,21 +305,15 @@ void ndpi_search_smpp_tcp(struct ndpi_detection_module_struct* ndpi_struct,
       }
     }
 
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
   }
 }
 
 
-void init_smpp_dissector(struct ndpi_detection_module_struct* ndpi_struct, 
-                         u_int32_t* id, 
-                         NDPI_PROTOCOL_BITMASK* detection_bitmask)
+void init_smpp_dissector(struct ndpi_detection_module_struct* ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("SMPP", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_SMPP,
-				      ndpi_search_smpp_tcp,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("SMPP", ndpi_struct,
+                     ndpi_search_smpp_tcp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_SMPP);
 }

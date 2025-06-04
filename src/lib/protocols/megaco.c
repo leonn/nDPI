@@ -23,10 +23,11 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_MEGACO
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 
-void ndpi_search_megaco(struct ndpi_detection_module_struct *ndpi_struct,
-			struct ndpi_flow_struct *flow)
+static void ndpi_search_megaco(struct ndpi_detection_module_struct *ndpi_struct,
+			       struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   
@@ -46,18 +47,14 @@ void ndpi_search_megaco(struct ndpi_detection_module_struct *ndpi_struct,
     } 
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 
-void init_megaco_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_megaco_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("Megaco", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_MEGACO,
-				      ndpi_search_megaco,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("Megaco", ndpi_struct,
+                     ndpi_search_megaco,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                      1, NDPI_PROTOCOL_MEGACO);
 }

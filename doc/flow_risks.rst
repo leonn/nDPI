@@ -73,9 +73,9 @@ HTTP only: this risk is triggered whenever the user agent contains suspicious ch
 
 .. _Risk 012:
 
-NDPI_HTTP_NUMERIC_IP_HOST
+NDPI_NUMERIC_IP_HOST
 =========================
-HTTP only: this risk is triggered whenever we're accessing a host using its IP rather than its symbolic name. Example http://1.2.3.4.
+This risk is triggered whenever a HTTP/TLS/QUIC connection is using a literal IPv4 or IPv6 address as ServerName (TLS/QUIC; example: SNI=1.2.3.4) or as Hostname (HTTP; example: http://1.2.3.4.).
 
 .. _Risk 013:
 
@@ -105,7 +105,7 @@ A `DGA <https://en.wikipedia.org/wiki/Domain_generation_algorithm>`_ is used to 
 
 NDPI_MALFORMED_PACKET
 =====================
-This risk is generated when a packet (e.g. a DNS packet) has an unexpected formt. This can indicate a protocol error or more often an attempt to jeopardize a valid protocol to carry other type of data.
+This risk is generated when a packet (e.g. a DNS packet) has an unexpected format. This can indicate a protocol error or more often an attempt to jeopardize a valid protocol to carry other type of data.
 
 .. _Risk 018:
 
@@ -127,9 +127,9 @@ This risk indicates that the `SMB <https://en.wikipedia.org/wiki/Server_Message_
 
 .. _Risk 021:
 
-NDPI_TLS_SUSPICIOUS_ESNI_USAGE
-==============================
-`SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ is a way to carry in TLS the host/domain name we're accessing. ESNI means encrypted SNI and it is a way to mask SNI (carried in clear text in the TLS header) with encryption. While this practice is legal, it could be used for hiding data or for attacks such as a suspicious `domain fronting <https://github.com/SixGenInc/Noctilucent/blob/master/docs/>`_.
+NDPI_FREE_21
+============
+Placeholder; not really used.
 
 .. _Risk 022:
 
@@ -141,7 +141,8 @@ This risk indicates that the protocol used is insecure and that a secure protoco
 
 NDPI_DNS_SUSPICIOUS_TRAFFIC
 ===========================
-This risk is returned when DNS traffic returns an unexpected/obsolete `record type <https://en.wikipedia.org/wiki/List_of_DNS_record_types>`_.
+This risk is returned when DNS traffic returns an unexpected/obsolete `record type <https://en.wikipedia.org/wiki/List_of_DNS_record_types>`_
+or when a suspicious query with a very long host name is detected.
 
 .. _Risk 024:
 
@@ -169,9 +170,9 @@ This is a placeholder for traffic exchanged with domain names that are considere
 
 .. _Risk 028:
 
-NDPI_MALICIOUS_JA3
-==================
-`JA3 <https://engineering.salesforce.com/tls-fingerprinting-with-ja3-and-ja3s-247362855967>`_ is a method to fingerprint TLS traffic. This risk indicates that the JA3 of the TLS connection is considered suspicious (i.e. it has been found in known malware JA3 blacklists). nDPI does not fill this risk that instead should be filled by aplications sitting on top of nDPI (e.g. ntopng).
+NDPI_MALICIOUS_FINGERPRINT
+==========================
+This risk indicates that the Fingerprint of the TLS connection is considered suspicious. nDPI does not fill this risk that instead should be filled by aplications sitting on top of nDPI (e.g. ntopng).
 
 .. _Risk 029:
 
@@ -213,13 +214,13 @@ This risk is triggered when a TLS fatal alert is detected in the TLS flow. See `
 
 NDPI_SUSPICIOUS_ENTROPY
 =======================
-This risk is used to detect suspicious data carried in ICMP packets whose entropy (used to measure how data is distributed, hence to indirectly guess the type of data carried on) is suspicious and thus that it can indicate a data leak.
+This risk is used to detect suspicious data carried in ICMP packets whose entropy (used to measure how data is distributed, hence to indirectly guess the type of data carried on) is suspicious and thus that it can indicate a data leak. Suspicious values indicate random entropy or entropy that is similar to encrypted traffic. In the latter case, this can be a suspicious data exfiltration symptom.
 
 .. _Risk 036:
 
 NDPI_CLEAR_TEXT_CREDENTIALS
 ===========================
-Clear text protocols are not bad per-se, but they should be avoided when they carry credentials as they can be intercepted by malicious users. This risk is triggered whenever clear text protocols (e.g. FTP, HTTP, IMAP...) contain credentials in clear text (read it as nDPI does not trigger this risk for HTTP connections that do not carry credentials).
+Clear text protocols are not intrinsically bad, but they should be avoided when they carry credentials as they can be intercepted by malicious users. This risk is triggered whenever clear text protocols (e.g. FTP, HTTP, IMAP...) contain credentials in clear text (read it as nDPI does not trigger this risk for HTTP connections that do not carry credentials).
 
 .. _Risk 037:
 
@@ -246,7 +247,7 @@ Additionally, some TLS protocol fields are checked for printable characters as w
 
 NDPI_POSSIBLE_EXPLOIT
 =====================
-The risk is set whenever a possible exploit (e.g. `Log4J/Log4Shell <https://en.wikipedia.org/wiki/Log4Shell>`_) is detected.
+The risk is set whenever a possible exploit attempt (e.g. `Log4J/Log4Shell <https://en.wikipedia.org/wiki/Log4Shell>`_) is detected.
 
 .. _Risk 041:
 
@@ -276,12 +277,72 @@ The risk is set whenever a crawler/bot/robot has been detected
 
 NDPI_ANONYMOUS_SUBSCRIBER
 ===================================
-The risk is set whenever the (source) ip address has been anonymized and it can't be used to identify the subscriber.
+The risk is set whenever the (source) IP address has been anonymized and it can't be used to identify the subscriber.
 Example: the flow is generated by an iCloud-private-relay exit node.
 
 .. _Risk 046:
 
-NDPI_UNIDIRECTIONAL_TRAFFIC_SUBSCRIBER
+NDPI_UNIDIRECTIONAL_TRAFFIC
 ===================================
 The risk is set whenever the flow has unidirectional traffic (typically no traffic on the server to client direction). THis
 risk is not triggered for multicast/broadcast destinations.
+
+.. _Risk 047:
+
+NDPI_HTTP_OBSOLETE_SERVER
+===================================
+This risk is generated whenever a HTTP server uses an obsolete HTTP server version.
+
+.. _Risk 048:
+
+NDPI_PERIODIC_FLOW
+==================
+This risk is generated whenever a flow is observed at a specific periodic pace (e.g. every 10 seconds).
+
+.. _Risk 049:
+
+NDPI_MINOR_ISSUES
+=================
+Minor packet/flow issues (e.g. DNS traffic with zero TTL) have been detected.
+
+.. _Risk 050:
+
+NDPI_TCP_ISSUES
+===============
+Relevant TCP connection issues such as connection refused, scan, or probe attempt.
+
+.. _Risk 051
+
+NDPI_FREE_51
+============
+Placeholder; not really used.
+
+.. _Risk 052
+
+NDPI_TLS_ALPN_SNI_MISMATCH
+=========================
+Invalid TLS ALPN/SNI mismatch. For instance ALPN advertises the flow as h2 (HTTP/2.0) and no SNI is reported.
+
+.. _Risk 053
+
+NDPI_MALWARE_CONTACTED
+======================
+Client contacted a server host labelled as malware.
+
+.. _Risk 054:
+
+NDPI_BINARY_DATA_TRANSFER
+============================
+HTTP only: this risk indicates that a binary file/data application transfer (attempt).
+
+.. _Risk 055:
+
+NDPI_PROBING_ATTEMPT
+====================
+Connection with no data exchaged that looks like a probing attempt
+
+.. _Risk 056:
+
+NDPI_OBFUSCATED_TRAFFIC
+=======================
+This risk is triggered when a connection is likely using some obfuscation technique to try to "look like" something else, hiding its true nature

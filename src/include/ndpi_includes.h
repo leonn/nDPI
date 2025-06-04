@@ -1,7 +1,7 @@
 /*
  * ndpi_includes.h
  *
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -34,18 +34,16 @@
 #include <limits.h>
 #include <stdbool.h>
 
-#ifdef WIN32
+#if defined(WIN32) || defined(_MSC_VER)
 #include "ndpi_win32.h"
 #else
 #include <sys/types.h>
 #include <sys/param.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/tcp.h>
-#include <netinet/udp.h>
 
 #if !defined __APPLE__ && !defined __FreeBSD__ && !defined __NetBSD__ && !defined __OpenBSD__
 #include <endian.h>

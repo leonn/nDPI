@@ -11,18 +11,26 @@ RANLIB = @RANLIB@
 #
 # Installation directories
 #
-prefix     = @prefix@
+PREFIX     = @prefix@
 libdir     = @libdir@
 includedir = @includedir@/ndpi
 ifneq ($(OS),Windows_NT)
+OS := $(shell uname)
+endif
+ifneq ($(OS),Windows_NT)
 CFLAGS     += -fPIC -DPIC
 endif
-CFLAGS     += -I../include -Ithird_party/include -DNDPI_LIB_COMPILATION @NDPI_CFLAGS@ @GPROF_CFLAGS@ @CUSTOM_NDPI@ @ADDITIONAL_INCS@
+CFLAGS     += -I. -I../include -Ithird_party/include -DNDPI_LIB_COMPILATION @NDPI_CFLAGS@ @GPROF_CFLAGS@ @CUSTOM_NDPI@ @ADDITIONAL_INCS@
+CFLAGS_ndpi_bitmap.c := -Wno-unused-function
+CFLAGS_ndpi_bitmap64_fuse.c := -Wno-unused-function
+CFLAGS_third_party/src/gcrypt_light.c := -Wno-unused-function -Wno-unused-parameter
+CFLAGS_third_party/src/ahocorasick.c := -Wno-unused-function -Wno-unused-parameter
+CFLAGS_third_party/src/roaring.c := -Wno-unused-function -Wno-attributes
 LDFLAGS    += @NDPI_LDFLAGS@
 LIBS       = @ADDITIONAL_LIBS@ @LIBS@ @GPROF_LIBS@
 
-OBJECTS   = $(patsubst protocols/%.c, protocols/%.o, $(wildcard protocols/*.c)) $(patsubst third_party/src/%.c, third_party/src/%.o, $(wildcard third_party/src/*.c)) $(patsubst ./%.c, ./%.o, $(wildcard ./*.c))
-HEADERS   = $(wildcard ../include/*.h)
+OBJECTS   = $(patsubst protocols/%.c, protocols/%.o, $(wildcard protocols/*.c)) $(patsubst third_party/src/%.c, third_party/src/%.o, $(wildcard third_party/src/*.c)) $(patsubst third_party/src/hll/%.c, third_party/src/hll/%.o, $(wildcard third_party/src/hll/*.c)) $(patsubst ./%.c, ./%.o, $(wildcard ./*.c))
+HEADERS   = $(wildcard ../include/*.h) $(wildcard *.h)
 NDPI_VERSION_MAJOR   = @NDPI_MAJOR@
 NDPI_LIB_STATIC      = libndpi.a
 NDPI_LIB_SHARED_BASE = libndpi.so
@@ -35,13 +43,10 @@ TMP_OBJS := $(OBJECTS)
 OBJECTS   = $(filter-out third_party/src/gcrypt_light.o,$(TMP_OBJS))
 endif
 
-ifneq ($(OS),Windows_NT)
-OS := $(shell uname)
-endif
 BUILD_MINGW    		 = @BUILD_MINGW@
 
 ifeq ($(OS),Darwin)
-CC=clang
+CC=clang -fno-color-diagnostics
 SONAME_FLAG=
 else
 ifneq ($(BUILD_MINGW),)
@@ -66,7 +71,7 @@ $(NDPI_LIB_SHARED): $(OBJECTS)
 	ln -fs $(NDPI_LIB_SHARED) $(NDPI_LIB_SHARED_BASE).$(NDPI_VERSION_MAJOR)
 
 %.o: %.c $(HEADERS) Makefile
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_$<) -c $< -o $@
 
 clean:
 	/bin/rm -f $(NDPI_LIB_STATIC) $(OBJECTS) *.o *.so *.lo libndpi.so*
@@ -91,9 +96,10 @@ cppcheck:
 	cppcheck --template='{file}:{line}:{severity}:{message}' --quiet --enable=all --force -I ../include *.c protocols/*.c
 
 install: $(NDPI_LIBS)
-	mkdir -p $(DESTDIR)$(libdir)
-	cp $(NDPI_LIBS) $(DESTDIR)$(libdir)/
-	cp -P $(NDPI_LIB_SHARED_BASE) $(DESTDIR)$(libdir)/
-	cp -P $(NDPI_LIB_SHARED_BASE).$(NDPI_VERSION_MAJOR) $(DESTDIR)$(libdir)/
-	mkdir -p $(DESTDIR)$(includedir)
-	cp ../include/*.h $(DESTDIR)$(includedir)
+	mkdir -p $(DESTDIR)$(PREFIX)$(libdir)
+	cp $(NDPI_LIBS) $(DESTDIR)$(PREFIX)$(libdir)/
+	cp -P $(NDPI_LIB_SHARED_BASE) $(DESTDIR)$(PREFIX)$(libdir)/
+	cp -P $(NDPI_LIB_SHARED_BASE).$(NDPI_VERSION_MAJOR) $(DESTDIR)$(PREFIX)$(libdir)/
+	mkdir -p $(DESTDIR)$(PREFIX)$(includedir)
+	#Avoid installing private header
+	find ../include/*.h ! -name ndpi_private.h -exec cp "{}" $(DESTDIR)$(PREFIX)$(includedir)/ \;

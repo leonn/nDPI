@@ -25,6 +25,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_MONGODB
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 /* https://docs.mongodb.com/manual/reference/mongodb-wire-protocol/ */
 
@@ -67,7 +68,7 @@ static void ndpi_check_mongodb(struct ndpi_detection_module_struct *ndpi_struct,
   uint32_t responseFlags;
 
   if (packet->payload_packet_len <= sizeof(mongodb_hdr)) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -80,7 +81,7 @@ static void ndpi_check_mongodb(struct ndpi_detection_module_struct *ndpi_struct,
      || (le32toh(mongodb_hdr.message_length) > 1000000) /* Used to avoid false positives */
      ) {
     NDPI_LOG_DBG(ndpi_struct, "Invalid MONGODB length");
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -114,21 +115,17 @@ static void ndpi_check_mongodb(struct ndpi_detection_module_struct *ndpi_struct,
 
   default:
     NDPI_LOG_DBG(ndpi_struct, "Invalid MONGODB length");
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     break;
   }
 }
 
-void ndpi_search_mongodb(struct ndpi_detection_module_struct *ndpi_struct,
-			 struct ndpi_flow_struct *flow)
+static void ndpi_search_mongodb(struct ndpi_detection_module_struct *ndpi_struct,
+				struct ndpi_flow_struct *flow)
 {
   // Break after 6 packets.
   if(flow->packet_counter > 6) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
-    return;
-  }
-
-  if(flow->detected_protocol_stack[0] != NDPI_PROTOCOL_UNKNOWN) {
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -141,13 +138,9 @@ void ndpi_search_mongodb(struct ndpi_detection_module_struct *ndpi_struct,
 /* ********************************* */
 
 
-void init_mongodb_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-			    u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask) {
-  ndpi_set_bitmask_protocol_detection("MongoDB", ndpi_struct, detection_bitmask,
-				      *id, NDPI_PROTOCOL_MONGODB, ndpi_search_mongodb,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+void init_mongodb_dissector(struct ndpi_detection_module_struct *ndpi_struct) {
+  register_dissector("MongoDB", ndpi_struct,
+                     ndpi_search_mongodb,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                      1, NDPI_PROTOCOL_MONGODB);
 }

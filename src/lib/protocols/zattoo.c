@@ -25,6 +25,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_ZATTOO
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 	
 #if !defined(WIN32)
 static inline
@@ -33,7 +34,7 @@ __mingw_forceinline static
 #else
 __forceinline static
 #endif
-u_int8_t ndpi_int_zattoo_user_agent_set(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+u_int8_t ndpi_int_zattoo_user_agent_set(struct ndpi_detection_module_struct *ndpi_struct)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
@@ -49,7 +50,7 @@ u_int8_t ndpi_int_zattoo_user_agent_set(struct ndpi_detection_module_struct *ndp
 #define ZATTOO_DETECTED \
       ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_ZATTOO, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI /* TODO */)
 
-void ndpi_search_zattoo(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_zattoo(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
@@ -89,7 +90,7 @@ void ndpi_search_zattoo(struct ndpi_detection_module_struct *ndpi_struct, struct
        * that might be changed later */
       ndpi_parse_packet_line_info(ndpi_struct, flow);
 
-      if(ndpi_int_zattoo_user_agent_set(ndpi_struct, flow)) {
+      if(ndpi_int_zattoo_user_agent_set(ndpi_struct)) {
 	
 	NDPI_LOG_INFO(ndpi_struct, "found zattoo. add connection over tcp with pattern GET / or POST /\n");
 	ZATTOO_DETECTED;
@@ -170,17 +171,6 @@ void ndpi_search_zattoo(struct ndpi_detection_module_struct *ndpi_struct, struct
       ZATTOO_DETECTED;
       return;
       
-    } else if(flow->zattoo_stage == 5 + packet->packet_direction && (packet->payload_packet_len == 125)) {
-
-      NDPI_LOG_INFO(ndpi_struct, "found zattoo\n");
-      ZATTOO_DETECTED;
-      return;
-      
-    } else if(flow->zattoo_stage == 6 - packet->packet_direction && packet->payload_packet_len == 1412) {
-
-      NDPI_LOG_INFO(ndpi_struct, "found zattoo\n");
-      ZATTOO_DETECTED;
-      return;
     }
     
     NDPI_LOG_DBG2(ndpi_struct,
@@ -214,18 +204,14 @@ void ndpi_search_zattoo(struct ndpi_detection_module_struct *ndpi_struct, struct
 
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 
-void init_zattoo_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_zattoo_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("Zattoo", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_ZATTOO,
-				      ndpi_search_zattoo,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("Zattoo", ndpi_struct,
+                     ndpi_search_zattoo,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_ZATTOO);
 }

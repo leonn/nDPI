@@ -28,6 +28,7 @@ static ndpi_network ndpi_protocol_line_protocol_list[] = {
  { 0x77EBE800 /* 119.235.232.0/24 */, 24, NDPI_PROTOCOL_LINE },
  { 0x77EBEB00 /* 119.235.235.0/24 */, 24, NDPI_PROTOCOL_LINE },
  { 0x77EBEC00 /* 119.235.236.0/23 */, 23, NDPI_PROTOCOL_LINE },
+ { 0x7DD1FC00 /* 125.209.252.0/24 */, 24, NDPI_PROTOCOL_LINE },
  { 0x935C8000 /* 147.92.128.0/17 */, 17, NDPI_PROTOCOL_LINE },
  { 0xCB688000 /* 203.104.128.0/20 */, 20, NDPI_PROTOCOL_LINE },
  { 0xCB689000 /* 203.104.144.0/21 */, 21, NDPI_PROTOCOL_LINE },
@@ -36,4 +37,10 @@ static ndpi_network ndpi_protocol_line_protocol_list[] = {
  { 0xCB689E00 /* 203.104.158.0/24 */, 24, NDPI_PROTOCOL_LINE },
  /* End */
  { 0x0, 0, 0 }
+};
+
+static ndpi_network6 ndpi_protocol_line_protocol_list_6[] = {
+ { "2400:dcc0::", 32, NDPI_PROTOCOL_LINE },
+ /* End */
+ { NULL, 0, 0 }
 };

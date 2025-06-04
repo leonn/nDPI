@@ -1,7 +1,7 @@
 /*
  * snmp.c
  *
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  *
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -23,6 +23,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_SNMP
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 /* #define SNMP_DEBUG */
 
@@ -54,8 +55,8 @@ static int ndpi_search_snmp_again(struct ndpi_detection_module_struct *ndpi_stru
 
 /* *************************************************************** */
 
-void ndpi_search_snmp(struct ndpi_detection_module_struct *ndpi_struct,
-		      struct ndpi_flow_struct *flow) {
+static void ndpi_search_snmp(struct ndpi_detection_module_struct *ndpi_struct,
+			     struct ndpi_flow_struct *flow) {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int16_t snmp_port = htons(161), trap_port = htons(162);
 
@@ -63,7 +64,7 @@ void ndpi_search_snmp(struct ndpi_detection_module_struct *ndpi_struct,
      (packet->udp->dest != snmp_port) &&
      (packet->udp->source != trap_port) &&
      (packet->udp->dest != trap_port)) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -71,7 +72,7 @@ void ndpi_search_snmp(struct ndpi_detection_module_struct *ndpi_struct,
     u_int16_t len_length = 0, offset;
     int64_t len;
 
-    len = ndpi_asn1_ber_decode_length(&packet->payload[1], packet->payload_packet_len - 1, &len_length);
+    len = asn1_ber_decode_length(&packet->payload[1], packet->payload_packet_len - 1, &len_length);
 
     if(len > 2 &&
        1 + len_length + len == packet->payload_packet_len &&
@@ -105,10 +106,10 @@ void ndpi_search_snmp(struct ndpi_detection_module_struct *ndpi_struct,
           if(snmp_primitive == 2 /* Get Response */ &&
              snmp_primitive_offset + 1 < packet->payload_packet_len) {
             offset = snmp_primitive_offset + 1;
-            ndpi_asn1_ber_decode_length(&packet->payload[offset], packet->payload_packet_len - offset, &len_length);
+            asn1_ber_decode_length(&packet->payload[offset], packet->payload_packet_len - offset, &len_length);
             offset += len_length + 1;
             if(offset < packet->payload_packet_len) {
-              len = ndpi_asn1_ber_decode_length(&packet->payload[offset], packet->payload_packet_len - offset, &len_length);
+              len = asn1_ber_decode_length(&packet->payload[offset], packet->payload_packet_len - offset, &len_length);
 
               u_int8_t error_status_offset = offset + len_length + len + 2;
 
@@ -140,18 +141,13 @@ void ndpi_search_snmp(struct ndpi_detection_module_struct *ndpi_struct,
     }
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
-void init_snmp_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-			 u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask) {
-  ndpi_set_bitmask_protocol_detection("SNMP", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_SNMP,
-				      ndpi_search_snmp,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+void init_snmp_dissector(struct ndpi_detection_module_struct *ndpi_struct) {
+  register_dissector("SNMP", ndpi_struct,
+                     ndpi_search_snmp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_SNMP);
 }
 

@@ -25,6 +25,8 @@
 #include "ndpi_protocol_ids.h"
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_QUIC
 #include "ndpi_api.h"
+#include "ndpi_private.h"
+
 
 #ifdef USE_HOST_LIBGCRYPT
 #include <gcrypt.h>
@@ -38,17 +40,13 @@
    * https://groups.google.com/a/chromium.org/g/proto-quic/c/OAVgFqw2fko/m/jCbjP0AVAAAJ
    * https://groups.google.com/a/chromium.org/g/proto-quic/c/OAVgFqw2fko/m/-NYxlh88AgAJ
    * https://docs.google.com/document/d/1FcpCJGTDEMblAs-Bm5TYuqhHyUqeWpqrItw2vkMFsdY/edit
-   * https://tools.ietf.org/html/draft-ietf-quic-tls-29
-   * https://tools.ietf.org/html/draft-ietf-quic-transport-29
+   * https://www.rfc-editor.org/rfc/rfc9001.txt [Using TLS over QUIC]
+   * https://www.rfc-editor.org/rfc/rfc9000.txt [v1]
+   * https://www.rfc-editor.org/rfc/rfc9369.txt [v2]
    */
 
-extern int processClientServerHello(struct ndpi_detection_module_struct *ndpi_struct,
-                                    struct ndpi_flow_struct *flow, uint32_t quic_version);
-extern int http_process_user_agent(struct ndpi_detection_module_struct *ndpi_struct,
-                                   struct ndpi_flow_struct *flow,
-                                   const u_int8_t *ua_ptr, u_int16_t ua_ptr_len);
-
 /* Versions */
+#define V_2		0x6b3343cf
 #define V_1		0x00000001
 #define V_Q024		0x51303234
 #define V_Q025		0x51303235
@@ -69,6 +67,10 @@ extern int http_process_user_agent(struct ndpi_detection_module_struct *ndpi_str
 
 #define QUIC_MAX_CID_LENGTH  20
 
+static int is_version_forcing_vn(uint32_t version)
+{
+  return (version & 0x0F0F0F0F) == 0x0a0a0a0a; /* Forcing Version Negotiation */
+}
 static int is_version_gquic(uint32_t version)
 {
   return ((version & 0xFFFFFF00) == 0x54303500) /* T05X */ ||
@@ -82,8 +84,8 @@ static int is_version_quic(uint32_t version)
   return version == V_1 ||
     ((version & 0xFFFFFF00) == 0xFF000000) /* IETF Drafts*/ ||
     ((version & 0xFFFFF000) == 0xfaceb000) /* Facebook */ ||
-    ((version & 0x0F0F0F0F) == 0x0a0a0a0a) /* Forcing Version Negotiation */ ||
-    (version == 0x709A50C4);               /* V2 IETF Drafts */
+    is_version_forcing_vn(version) ||
+    (version == V_2);
 }
 static int is_version_valid(uint32_t version)
 {
@@ -107,16 +109,16 @@ static uint8_t get_u8_quic_ver(uint32_t version)
 
   /* "Versions that follow the pattern 0x?a?a?a?a are reserved for use in
      forcing version negotiation to be exercised".
-     It is tricky to return a correct draft version: such number is primarly
-     used to select a proper salt (which depends on the version itself), but
-     we don't have a real version here! Let's hope that we need to handle
-     only latest drafts... */
-  if ((version & 0x0F0F0F0F) == 0x0a0a0a0a)
-    return 29;
+     We can't return a correct draft version because we don't have a real
+     version here! That means that we can't decode any data and we can dissect
+     only the cleartext header.
+     Let's return v1 (any other numbers should be fine, anyway) to only allow
+     the dissection of the (expected) long header */
+  if(is_version_forcing_vn(version))
+    return 34;
 
   /* QUIC Version 2 */
-  /* For the time being use 100 as a number for V2 and let see how v2 drafts evolve */
-  if (version == 0x709A50C4)
+  if (version == V_2)
     return 100;
 
   return 0;
@@ -127,8 +129,7 @@ static int is_quic_ver_less_than(uint32_t version, uint8_t max_version)
   uint8_t u8_ver = get_u8_quic_ver(version);
   return u8_ver && u8_ver <= max_version;
 }
-
-static int is_quic_ver_greater_than(uint32_t version, uint8_t min_version)
+int is_quic_ver_greater_than(uint32_t version, uint8_t min_version)
 {
   return get_u8_quic_ver(version) >= min_version;
 }
@@ -171,7 +172,7 @@ static int is_version_with_encrypted_header(uint32_t version)
     ((version & 0xFFFFFF00) == 0x51303500) /* Q05X */ ||
     ((version & 0xFFFFFF00) == 0x54303500) /* T05X */;
 }
-static int is_version_with_tls(uint32_t version)
+int is_version_with_tls(uint32_t version)
 {
   return is_version_quic(version) ||
     ((version & 0xFFFFFF00) == 0x54303500) /* T05X */;
@@ -197,7 +198,48 @@ static int is_version_with_v1_labels(uint32_t version)
 }
 static int is_version_quic_v2(uint32_t version)
 {
-  return version == 0x709A50C4;
+  return version == V_2;
+}
+
+char *ndpi_quic_version2str(char *buf, int buf_len, u_int32_t version) {
+
+  if(buf == NULL || buf_len <= 1)
+    return NULL;
+
+  switch(version) {
+  case V_2: strncpy(buf, "V-2", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_1: strncpy(buf, "V-1", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_Q024: strncpy(buf, "Q024", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_Q025: strncpy(buf, "Q025", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_Q030: strncpy(buf, "Q030", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_Q033: strncpy(buf, "Q033", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_Q034: strncpy(buf, "Q034", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_Q035: strncpy(buf, "Q035", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_Q037: strncpy(buf, "Q037", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_Q039: strncpy(buf, "Q039", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_Q043: strncpy(buf, "Q043", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_Q046: strncpy(buf, "Q046", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_Q050: strncpy(buf, "Q050", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_T050: strncpy(buf, "T050", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_T051: strncpy(buf, "T051", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_MVFST_22: strncpy(buf, "MVFST-22", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_MVFST_27: strncpy(buf, "MVFST-27", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  case V_MVFST_EXP: strncpy(buf, "MVFST-EXP", buf_len); buf[buf_len - 1] = '\0'; return buf;
+  }
+
+  if(is_version_forcing_vn(version)) {
+    strncpy(buf, "Ver-Negotiation", buf_len);
+    buf[buf_len - 1] = '\0';
+    return buf;
+  }
+  if(((version & 0xFFFFFF00) == 0xFF000000)) {
+    snprintf(buf, buf_len, "Draft-%d", version & 0x000000FF);
+    buf[buf_len - 1] = '\0';
+    return buf;
+  }
+
+  ndpi_snprintf(buf, buf_len, "Unknown (%04X)", version);
+  return buf;
 }
 
 int quic_len(const uint8_t *buf, uint64_t *value)
@@ -245,7 +287,8 @@ static uint16_t gquic_get_u16(const uint8_t *buf, uint32_t version)
 }
 
 
-char *__gcry_err(gpg_error_t err, char *buf, size_t buflen)
+#ifdef NDPI_ENABLE_DEBUG_MESSAGES
+static char *__gcry_err(gpg_error_t err, char *buf, size_t buflen)
 {
   gpg_strerror_r(err, buf, buflen);
   /* I am not sure if the string will be always null-terminated...
@@ -254,6 +297,7 @@ char *__gcry_err(gpg_error_t err, char *buf, size_t buflen)
     buf[buflen - 1] = '\0';
   return buf;
 }
+#endif
 
 static uint64_t pntoh64(const void *p)
 {
@@ -476,8 +520,10 @@ static int tls13_hkdf_expand_label_context(struct ndpi_detection_module_struct *
 #endif
 
   *out = (uint8_t *)ndpi_malloc(out_len);
-  if(!*out)
+  if(!*out) {
+    ndpi_free(info_data);
     return 0;
+  }
   err = hkdf_expand(md, secret->data, secret->data_len, info_data, info_len, *out, out_len);
   ndpi_free(info_data);
 
@@ -596,7 +642,8 @@ static int quic_get_pn_cipher_algo(int cipher_algo, int *hp_cipher_mode)
  * algorithm output.
  */
 static int quic_hp_cipher_prepare(struct ndpi_detection_module_struct *ndpi_struct,
-				  quic_hp_cipher *hp_cipher, int hash_algo, int cipher_algo, uint8_t *secret, u_int32_t version)
+                                  quic_hp_cipher *hp_cipher, int hash_algo, int cipher_algo,
+                                  uint8_t *secret, u_int32_t version)
 {
 #if 0
   /* Clear previous state (if any). */
@@ -627,7 +674,8 @@ static int quic_hp_cipher_prepare(struct ndpi_detection_module_struct *ndpi_stru
   return 1;
 }
 static int quic_pp_cipher_prepare(struct ndpi_detection_module_struct *ndpi_struct,
-				  quic_pp_cipher *pp_cipher, int hash_algo, int cipher_algo, int cipher_mode, uint8_t *secret, u_int32_t version)
+                                  quic_pp_cipher *pp_cipher, int hash_algo, int cipher_algo,
+                                  int cipher_mode, uint8_t *secret, u_int32_t version)
 {
 #if 0
   /* Clear previous state (if any). */
@@ -652,10 +700,18 @@ static int quic_pp_cipher_prepare(struct ndpi_detection_module_struct *ndpi_stru
   return 1;
 }
 static int quic_ciphers_prepare(struct ndpi_detection_module_struct *ndpi_struct,
-				quic_ciphers *ciphers, int hash_algo, int cipher_algo, int cipher_mode, uint8_t *secret, u_int32_t version)
+                                quic_ciphers *ciphers, int hash_algo, int cipher_algo,
+                                int cipher_mode, uint8_t *secret, u_int32_t version)
 {
-  return quic_hp_cipher_prepare(ndpi_struct, &ciphers->hp_cipher, hash_algo, cipher_algo, secret, version) &&
-    quic_pp_cipher_prepare(ndpi_struct, &ciphers->pp_cipher, hash_algo, cipher_algo, cipher_mode, secret, version);
+  int ret;
+
+  ret = quic_hp_cipher_prepare(ndpi_struct, &ciphers->hp_cipher, hash_algo, cipher_algo, secret, version);
+  if(ret != 1)
+    return ret;
+  ret = quic_pp_cipher_prepare(ndpi_struct, &ciphers->pp_cipher, hash_algo, cipher_algo, cipher_mode, secret, version);
+  if(ret != 1)
+    quic_hp_cipher_reset(&ciphers->hp_cipher);
+  return ret;
 }
 /**
  * Given a header protection cipher, a buffer and the packet number offset,
@@ -864,8 +920,8 @@ static int quic_derive_initial_secrets(struct ndpi_detection_module_struct *ndpi
     0x9a, 0xe6, 0xa4, 0xc8, 0x0c, 0xad, 0xcc, 0xbb, 0x7f, 0x0a
   };
   static const uint8_t handshake_salt_v2_draft_00[20] = {
-    0xa7, 0x07, 0xc2, 0x03, 0xa5, 0x9b, 0x47, 0x18, 0x4a, 0x1d,
-    0x62, 0xca, 0x57, 0x04, 0x06, 0xea, 0x7a, 0xe3, 0xe5, 0xd3
+    0x0d, 0xed, 0xe3, 0xde, 0xf7, 0x00, 0xa6, 0xdb, 0x81, 0x93,
+    0x81, 0xbe, 0x6e, 0x26, 0x9d, 0xcb, 0xf9, 0xbd, 0x2e, 0xd9
   };
   gcry_error_t err;
   uint8_t secret[HASH_SHA2_256_LENGTH];
@@ -926,7 +982,8 @@ static int quic_derive_initial_secrets(struct ndpi_detection_module_struct *ndpi
 
 
 static uint8_t *decrypt_initial_packet(struct ndpi_detection_module_struct *ndpi_struct,
-				       const uint8_t *dest_conn_id, uint8_t dest_conn_id_len,
+				       const uint8_t *orig_dest_conn_id, uint8_t orig_dest_conn_id_len,
+				       uint8_t dest_conn_id_len,
 				       uint8_t source_conn_id_len, uint32_t version,
 				       uint32_t *clear_payload_len)
 {
@@ -939,7 +996,7 @@ static uint8_t *decrypt_initial_packet(struct ndpi_detection_module_struct *ndpi
   uint8_t client_secret[HASH_SHA2_256_LENGTH];
 
   memset(&ciphers, '\0', sizeof(ciphers));
-  if(quic_derive_initial_secrets(ndpi_struct, version, dest_conn_id, dest_conn_id_len,
+  if(quic_derive_initial_secrets(ndpi_struct, version, orig_dest_conn_id, orig_dest_conn_id_len,
 				 client_secret) != 0) {
     NDPI_LOG_DBG(ndpi_struct, "Error quic_derive_initial_secrets\n");
     return NULL;
@@ -994,8 +1051,7 @@ static uint8_t *decrypt_initial_packet(struct ndpi_detection_module_struct *ndpi
     quic_ciphers_reset(&ciphers);
     return NULL;
   }
-  quic_decrypt_message(ndpi_struct,
-		       &ciphers.pp_cipher, &packet->payload[0], pn_offset + payload_length,
+  quic_decrypt_message(ndpi_struct, &ciphers.pp_cipher, &packet->payload[0], pn_offset + payload_length,
 		       offset, first_byte, pkn_len, packet_number, &decryption);
 
   quic_ciphers_reset(&ciphers);
@@ -1012,7 +1068,7 @@ static void update_reasm_buf_bitmap(u_int8_t *buffer_bitmap,
 				    const u_int32_t recv_pos,
 				    const u_int32_t recv_len)
 {
-  if (!recv_len || !buffer_bitmap_size || recv_pos + recv_len > buffer_bitmap_size * 8)
+  if (!recv_len || !buffer_bitmap_size || !buffer_bitmap || recv_pos + recv_len > buffer_bitmap_size * 8)
     return;
   const u_int32_t start_byte = recv_pos / 8;
   const u_int32_t end_byte = (recv_pos + recv_len - 1) / 8;
@@ -1037,6 +1093,9 @@ static int is_reasm_buf_complete(const u_int8_t *buffer_bitmap,
   const u_int32_t remaining_bits = buffer_len % 8;
   u_int32_t i;
 
+  if (!buffer_bitmap)
+    return 0;
+
   for(i = 0; i < complete_bytes; i++)
     if (buffer_bitmap[i] != 0xff)
       return 0;
@@ -1057,7 +1116,8 @@ static int __reassemble(struct ndpi_flow_struct *flow, const u_int8_t *frag,
 
   if(!flow->l4.udp.quic_reasm_buf) {
     flow->l4.udp.quic_reasm_buf = (uint8_t *)ndpi_malloc(max_quic_reasm_buffer_len);
-    flow->l4.udp.quic_reasm_buf_bitmap = (uint8_t *)ndpi_calloc(quic_reasm_buffer_bitmap_len, sizeof(uint8_t));
+    if(!flow->l4.udp.quic_reasm_buf_bitmap)
+      flow->l4.udp.quic_reasm_buf_bitmap = (uint8_t *)ndpi_calloc(quic_reasm_buffer_bitmap_len, sizeof(uint8_t));
     if(!flow->l4.udp.quic_reasm_buf || !flow->l4.udp.quic_reasm_buf_bitmap)
       return -1; /* Memory error */
     flow->l4.udp.quic_reasm_buf_last_pos = 0;
@@ -1125,16 +1185,16 @@ static const uint8_t *get_reassembled_crypto_data(struct ndpi_detection_module_s
   return NULL;
 }
 
-static const uint8_t *get_crypto_data(struct ndpi_detection_module_struct *ndpi_struct,
-				      struct ndpi_flow_struct *flow,
-				      uint32_t version,
-				      u_int8_t *clear_payload, uint32_t clear_payload_len,
-				      uint64_t *crypto_data_len)
+const uint8_t *get_crypto_data(struct ndpi_detection_module_struct *ndpi_struct,
+			       struct ndpi_flow_struct *flow,
+			       u_int8_t *clear_payload, uint32_t clear_payload_len,
+			       uint64_t *crypto_data_len)
 {
   const u_int8_t *crypto_data = NULL;
   uint32_t counter;
   uint8_t first_nonzero_payload_byte, offset_len;
   uint64_t unused, frag_offset, frag_len;
+  u_int32_t version = flow->protos.tls_quic.quic_version;
 
   counter = 0;
   while(counter < clear_payload_len && clear_payload[counter] == 0)
@@ -1221,12 +1281,12 @@ static const uint8_t *get_crypto_data(struct ndpi_detection_module_struct *ndpi_
       case 0x06:
         NDPI_LOG_DBG2(ndpi_struct, "CRYPTO frame\n");
         counter += 1;
-        if(counter > clear_payload_len ||
-           counter + quic_len_buffer_still_required(clear_payload[counter]) > clear_payload_len)
+        if(counter >= clear_payload_len ||
+           counter + quic_len_buffer_still_required(clear_payload[counter]) >= clear_payload_len)
           return NULL;
         counter += quic_len(&clear_payload[counter], &frag_offset);
-        if(counter > clear_payload_len ||
-           counter + quic_len_buffer_still_required(clear_payload[counter]) > clear_payload_len)
+        if(counter >= clear_payload_len ||
+           counter + quic_len_buffer_still_required(clear_payload[counter]) >= clear_payload_len)
           return NULL;
         counter += quic_len(&clear_payload[counter], &frag_len);
         if(frag_len + counter > clear_payload_len) {
@@ -1262,6 +1322,7 @@ static const uint8_t *get_crypto_data(struct ndpi_detection_module_struct *ndpi_
 }
 
 static uint8_t *get_clear_payload(struct ndpi_detection_module_struct *ndpi_struct,
+				  struct ndpi_flow_struct *flow,
 				  uint32_t version, uint32_t *clear_payload_len)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
@@ -1297,18 +1358,30 @@ static uint8_t *get_clear_payload(struct ndpi_detection_module_struct *ndpi_stru
 
     source_conn_id_len = packet->payload[6 + dest_conn_id_len];
     const u_int8_t *dest_conn_id = &packet->payload[6];
+
+    /* For initializing the ciphers we need the DCID of the very first Initial
+       sent by the client. This is quite important when CH is fragmented into multiple
+       packets and these packets have different DCID */
+    if(flow->l4.udp.quic_orig_dest_conn_id_len == 0) {
+      memcpy(flow->l4.udp.quic_orig_dest_conn_id,
+             dest_conn_id, dest_conn_id_len);
+      flow->l4.udp.quic_orig_dest_conn_id_len = dest_conn_id_len;
+    }
+
     clear_payload = decrypt_initial_packet(ndpi_struct,
-					   dest_conn_id, dest_conn_id_len,
+					   flow->l4.udp.quic_orig_dest_conn_id,
+					   flow->l4.udp.quic_orig_dest_conn_id_len,
+					   dest_conn_id_len,
 					   source_conn_id_len, version,
 					   clear_payload_len);
   }
 
   return clear_payload;
 }
-static void process_tls(struct ndpi_detection_module_struct *ndpi_struct,
-			struct ndpi_flow_struct *flow,
-			const u_int8_t *crypto_data, uint32_t crypto_data_len,
-			uint32_t version)
+
+void process_tls(struct ndpi_detection_module_struct *ndpi_struct,
+		 struct ndpi_flow_struct *flow,
+		 const u_int8_t *crypto_data, uint32_t crypto_data_len)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
@@ -1320,8 +1393,8 @@ static void process_tls(struct ndpi_detection_module_struct *ndpi_struct,
   packet->payload = crypto_data;
   packet->payload_packet_len = crypto_data_len;
 
-  processClientServerHello(ndpi_struct, flow, version);
-  flow->protos.tls_quic.hello_processed = 1; /* Allow matching of custom categories */
+  processClientServerHello(ndpi_struct, flow, flow->protos.tls_quic.quic_version);
+  flow->protos.tls_quic.client_hello_processed = 1; /* Allow matching of custom categories */
 
   /* Restore */
   packet->payload = p;
@@ -1334,15 +1407,15 @@ static void process_tls(struct ndpi_detection_module_struct *ndpi_struct,
   flow->protos.tls_quic.ssl_version = 0x0304;
 
   /* DNS-over-QUIC: ALPN is "doq" or "doq-XXX" (for drafts versions) */
-  if(flow->protos.tls_quic.alpn &&
-     strncmp(flow->protos.tls_quic.alpn, "doq", 3) == 0) {
-    NDPI_LOG_DBG(ndpi_struct, "Found DOQ (ALPN: [%s])\n", flow->protos.tls_quic.alpn);
+  if(flow->protos.tls_quic.advertised_alpns &&
+     strncmp(flow->protos.tls_quic.advertised_alpns, "doq", 3) == 0) {
+    NDPI_LOG_DBG(ndpi_struct, "Found DOQ (ALPN: [%s])\n", flow->protos.tls_quic.advertised_alpns);
     ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_DOH_DOT, NDPI_PROTOCOL_QUIC, NDPI_CONFIDENCE_DPI);
   }
 }
-static void process_chlo(struct ndpi_detection_module_struct *ndpi_struct,
-			 struct ndpi_flow_struct *flow,
-			 const u_int8_t *crypto_data, uint32_t crypto_data_len)
+void process_chlo(struct ndpi_detection_module_struct *ndpi_struct,
+		  struct ndpi_flow_struct *flow,
+		  const u_int8_t *crypto_data, uint32_t crypto_data_len)
 {
   const uint8_t *tag;
   uint32_t i;
@@ -1350,7 +1423,7 @@ static void process_chlo(struct ndpi_detection_module_struct *ndpi_struct,
   uint32_t prev_offset;
   uint32_t tag_offset_start, offset, len;
   ndpi_protocol_match_result ret_match;
-  int sni_found = 0, ua_found = 0;
+  int sni_found = 0, icsl_found = 0;
 
   if(crypto_data_len < 6)
     return;
@@ -1379,7 +1452,7 @@ static void process_chlo(struct ndpi_detection_module_struct *ndpi_struct,
 #endif
     if(memcmp(tag, "SNI\0", 4) == 0) {
 
-      ndpi_hostname_sni_set(flow, &crypto_data[tag_offset_start + prev_offset], len);
+      ndpi_hostname_sni_set(flow, &crypto_data[tag_offset_start + prev_offset], len, NDPI_HOSTNAME_NORM_ALL);
 
       NDPI_LOG_DBG2(ndpi_struct, "SNI: [%s]\n",
                     flow->host_server_name);
@@ -1387,37 +1460,40 @@ static void process_chlo(struct ndpi_detection_module_struct *ndpi_struct,
       ndpi_match_host_subprotocol(ndpi_struct, flow,
                                   flow->host_server_name,
                                   strlen(flow->host_server_name),
-                                  &ret_match, NDPI_PROTOCOL_QUIC);
-      flow->protos.tls_quic.hello_processed = 1; /* Allow matching of custom categories */
+                                  &ret_match, NDPI_PROTOCOL_QUIC, 1);
+      flow->protos.tls_quic.client_hello_processed = 1; /* Allow matching of custom categories */
 
       ndpi_check_dga_name(ndpi_struct, flow,
-                          flow->host_server_name, 1, 0);
+                          flow->host_server_name, 1, 0, 0);
 
-      if(ndpi_is_valid_hostname(flow->host_server_name,
-				strlen(flow->host_server_name)) == 0) {
-	char str[128];
+      if(ndpi_is_valid_hostname((char *)&crypto_data[tag_offset_start + prev_offset],
+				len) == 0) {
+        if(is_flowrisk_info_enabled(ndpi_struct, NDPI_INVALID_CHARACTERS)) {
+          char str[128];
 
-	snprintf(str, sizeof(str), "Invalid host %s", flow->host_server_name);
-	ndpi_set_risk(ndpi_struct, flow, NDPI_INVALID_CHARACTERS, str);
+	  snprintf(str, sizeof(str), "Invalid host %s", flow->host_server_name);
+	  ndpi_set_risk(ndpi_struct, flow, NDPI_INVALID_CHARACTERS, str);
+        } else {
+          ndpi_set_risk(ndpi_struct, flow, NDPI_INVALID_CHARACTERS, NULL);
+        }
 	
 	/* This looks like an attack */
-	ndpi_set_risk(ndpi_struct, flow, NDPI_POSSIBLE_EXPLOIT, NULL);
+	ndpi_set_risk(ndpi_struct, flow, NDPI_POSSIBLE_EXPLOIT, "Suspicious hostname: attack ?");
       }
       
       sni_found = 1;
-      if (ua_found)
+      if(icsl_found)
         return;
     }
 
-    if(memcmp(tag, "UAID", 4) == 0) {
-      u_int uaid_offset = tag_offset_start + prev_offset;
-            
-      NDPI_LOG_DBG2(ndpi_struct, "UA: [%.*s]\n", len, &crypto_data[uaid_offset]);
-	
-      http_process_user_agent(ndpi_struct, flow, &crypto_data[uaid_offset], len); /* http.c */
-      ua_found = 1;
-	
-      if (sni_found)
+    if(memcmp(tag, "ICSL", 4) == 0 && len >= 4) {
+      u_int icsl_offset = tag_offset_start + prev_offset;
+
+      flow->protos.tls_quic.quic_idle_timeout_sec = le32toh((*(uint32_t *)&crypto_data[icsl_offset]));
+      NDPI_LOG_DBG2(ndpi_struct, "ICSL: %d\n", flow->protos.tls_quic.quic_idle_timeout_sec);
+      icsl_found = 1;
+
+      if(sni_found)
         return;
     }
 
@@ -1429,15 +1505,82 @@ static void process_chlo(struct ndpi_detection_module_struct *ndpi_struct,
   /* Add check for missing SNI */
   if(flow->host_server_name[0] == '\0') {
     /* This is a bit suspicious */
-    ndpi_set_risk(ndpi_struct, flow, NDPI_TLS_MISSING_SNI, NULL);
+    ndpi_set_risk(ndpi_struct, flow, NDPI_TLS_MISSING_SNI, "SNI should be present all time: attack ?");
   }
 }
 
-static int may_be_0rtt(struct ndpi_detection_module_struct *ndpi_struct,
-		       struct ndpi_flow_struct *flow)
+static int may_be_gquic_rej(struct ndpi_detection_module_struct *ndpi_struct)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
-  uint32_t version;
+  void *ptr;
+
+  /* Common case: msg from server default port */
+  if(packet->udp->source != ntohs(443))
+    return 0;
+  /* GQUIC. Common case: cid length 8, no version, packet number length 1 */
+  if(packet->payload[0] != 0x08)
+    return 0;
+  if(packet->payload_packet_len < 1 + 8 + 1 + 12 /* Message auth hash */ + 16 /* Arbitrary length */)
+    return 0;
+  /* Search for "REJ" tag in the first 16 bytes after the hash */
+  ptr = memchr(&packet->payload[1 + 8 + 1 + 12], 'R', 16 - 3);
+  if(ptr && memcmp(ptr, "REJ", 3) == 0)
+    return 1;
+  return 0;
+}
+
+static int may_be_sh(struct ndpi_detection_module_struct *ndpi_struct,
+		     struct ndpi_flow_struct *flow)
+{
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
+  u_int8_t last_byte;
+
+  if((packet->payload[0] & 0x40) == 0)
+    return 0;
+  if(packet->udp->dest != ntohs(443)) {
+    if(packet->udp->source ==  ntohs(443)) {
+      return -1; /* Keep looking for packets sent by the client */
+    }
+    return 0;
+  }
+
+  /* SH packet sent by the client */
+
+  /* QUIC never retransmits packet, but we should also somehow check that
+   * these 3 packets from the client are really different from each other
+   * to avoid matching retransmissions on some other protocols.
+   * To avoid saving too much state, simply check the last byte of each packet
+   * (the idea is that being QUIC fully encrypted, the bytes are somehow always
+   * different; a weak assumption, but it allow us to save only 1 byte in
+   * flow structure and it seems to work)
+   * TODO: do we need something better?
+   */
+
+  if(packet->payload_packet_len < 1 + QUIC_SERVER_CID_HEURISTIC_LENGTH)
+    return 0;
+  last_byte = packet->payload[packet->payload_packet_len - 1];
+  if(flow->l4.udp.quic_server_cid_stage > 0) {
+    if(memcmp(flow->l4.udp.quic_server_cid, &packet->payload[1],
+              QUIC_SERVER_CID_HEURISTIC_LENGTH) != 0 ||
+       flow->l4.udp.quic_client_last_byte == last_byte)
+      return 0;
+    flow->l4.udp.quic_server_cid_stage++;
+    if(flow->l4.udp.quic_server_cid_stage == 3) {
+      /* Found QUIC via 3 SHs by client */
+      return 1;
+    }
+  } else {
+    memcpy(flow->l4.udp.quic_server_cid, &packet->payload[1], QUIC_SERVER_CID_HEURISTIC_LENGTH);
+    flow->l4.udp.quic_server_cid_stage = 1;
+  }
+  flow->l4.udp.quic_client_last_byte = last_byte;
+  return -1; /* Keep looking for other packets sent by client */
+}
+
+static int may_be_0rtt(struct ndpi_detection_module_struct *ndpi_struct,
+		       uint32_t *version)
+{
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int8_t first_byte;
   u_int8_t pub_bit1, pub_bit2, pub_bit3, pub_bit4;
   u_int8_t dest_conn_id_len, source_conn_id_len;
@@ -1454,23 +1597,23 @@ static int may_be_0rtt(struct ndpi_detection_module_struct *ndpi_struct,
   pub_bit3 = ((first_byte & 0x20) != 0);
   pub_bit4 = ((first_byte & 0x10) != 0);
 
-  version = ntohl(*((u_int32_t *)&packet->payload[1]));
+  *version = ntohl(*((u_int32_t *)&packet->payload[1]));
 
   /* IETF versions, Long header, fixed bit (ignore QUIC-bit-greased case), 0RTT */
 
-  if(!(is_version_quic(version) &&
+  if(!(is_version_quic(*version) &&
        pub_bit1 && pub_bit2)) {
     NDPI_LOG_DBG2(ndpi_struct, "Invalid header or version\n");
     return 0;
   }
-  if(!is_version_quic_v2(version) &&
+  if(!is_version_quic_v2(*version) &&
      (pub_bit3 != 0 || pub_bit4 != 1)) {
-    NDPI_LOG_DBG2(ndpi_struct, "Version 0x%x not 0-RTT Packet\n", version);
+    NDPI_LOG_DBG2(ndpi_struct, "Version 0x%x not 0-RTT Packet\n", *version);
     return 0;
   }
-  if(is_version_quic_v2(version) &&
+  if(is_version_quic_v2(*version) &&
      (pub_bit3 != 1 || pub_bit4 != 0)) {
-    NDPI_LOG_DBG2(ndpi_struct, "Version 0x%x not 0-RTT Packet\n", version);
+    NDPI_LOG_DBG2(ndpi_struct, "Version 0x%x not 0-RTT Packet\n", *version);
     return 0;
   }
 
@@ -1488,7 +1631,7 @@ static int may_be_0rtt(struct ndpi_detection_module_struct *ndpi_struct,
   if(dest_conn_id_len > QUIC_MAX_CID_LENGTH ||
      source_conn_id_len > QUIC_MAX_CID_LENGTH) {
     NDPI_LOG_DBG2(ndpi_struct, "Version 0x%x invalid CIDs length %u %u\n",
-                  version, dest_conn_id_len, source_conn_id_len);
+                  *version, dest_conn_id_len, source_conn_id_len);
     return 0;
   }
 
@@ -1565,7 +1708,7 @@ static int may_be_initial_pkt(struct ndpi_detection_module_struct *ndpi_struct,
      if the packet includes a token provided by the server in a NEW_TOKEN
      frame on a connection where the server also included the
      grease_quic_bit transport parameter." */
-  if((*version & 0x0F0F0F0F) == 0x0a0a0a0a &&
+  if(is_version_forcing_vn(*version) &&
      !(pub_bit1 == 1 && pub_bit2 == 1)) {
     NDPI_LOG_DBG2(ndpi_struct, "Version 0x%x with first byte 0x%x\n", *version, first_byte);
     return 0;
@@ -1591,28 +1734,40 @@ static int may_be_initial_pkt(struct ndpi_detection_module_struct *ndpi_struct,
 /* ***************************************************************** */
 
 static int eval_extra_processing(struct ndpi_detection_module_struct *ndpi_struct,
-				 struct ndpi_flow_struct *flow, u_int32_t version)
+                                 struct ndpi_flow_struct *flow)
 {
+  u_int32_t version = flow->protos.tls_quic.quic_version;
+
   /* For the time being we need extra processing in two cases only:
      1) to detect Snapchat calls, i.e. RTP/RTCP multiplxed with QUIC.
-     We noticed that Snapchat uses Q046, without any SNI.
+        Two cases:
+        a) [old] Q046, without any SNI
+        b) v1 with SNI *.addlive.io
      2) to reassemble CH fragments on multiple UDP packets.
      These two cases are mutually exclusive
   */
 
-  if((version == V_Q046 &&
-      flow->host_server_name[0] == '\0') ||
-     is_ch_reassembler_pending(flow)) {
-    NDPI_LOG_DBG2(ndpi_struct, "We have further work to do\n");
+  if(version == V_Q046 && flow->host_server_name[0] == '\0') {
+    NDPI_LOG_DBG2(ndpi_struct, "We have further work to do (old snapchat call?)\n");
     return 1;
   }
-  return 0;
-}
 
-static int is_valid_rtp_payload_type(uint8_t type)
-{
-  /* https://www.iana.org/assignments/rtp-parameters/rtp-parameters.xhtml */
-  return type <= 34 || (type >= 96 && type <= 127);
+  if(version == V_1 &&
+     flow->detected_protocol_stack[0] == NDPI_PROTOCOL_SNAPCHAT) {
+    size_t sni_len = strlen(flow->host_server_name);
+    if(sni_len > 11 &&
+       strcmp(flow->host_server_name + sni_len - 11, ".addlive.io") == 0) {
+      NDPI_LOG_DBG2(ndpi_struct, "We have further work to do (new snapchat call?)\n");
+      return 1;
+    }
+  }
+
+  if(is_ch_reassembler_pending(flow)) {
+    NDPI_LOG_DBG2(ndpi_struct, "We have further work to do (reasm)\n");
+    return 1;
+  }
+
+  return 0;
 }
 
 static void ndpi_search_quic(struct ndpi_detection_module_struct *ndpi_struct,
@@ -1631,6 +1786,9 @@ static int ndpi_search_quic_extra(struct ndpi_detection_module_struct *ndpi_stru
   /* TODO: could we unify ndpi_search_quic() and ndpi_search_quic_extra() somehow? */
 
   NDPI_LOG_DBG(ndpi_struct, "search QUIC extra func\n");
+
+  if(packet->payload_packet_len == 0)
+    return 1;
 
   if (is_ch_reassembler_pending(flow)) {
     ndpi_search_quic(ndpi_struct, flow);
@@ -1664,8 +1822,8 @@ static int ndpi_search_quic_extra(struct ndpi_detection_module_struct *ndpi_stru
     NDPI_LOG_DBG(ndpi_struct, "Found RTP/RTCP over QUIC\n");
     ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SNAPCHAT_CALL, NDPI_PROTOCOL_QUIC, NDPI_CONFIDENCE_DPI);
     /* In "extra_eval" data path, if we change the classification, we need to update the category, too */
-    proto.master_protocol = NDPI_PROTOCOL_QUIC;
-    proto.app_protocol = NDPI_PROTOCOL_SNAPCHAT_CALL;
+    proto.proto.master_protocol = NDPI_PROTOCOL_QUIC;
+    proto.proto.app_protocol = NDPI_PROTOCOL_SNAPCHAT_CALL;
     proto.category = NDPI_PROTOCOL_CATEGORY_UNSPECIFIED;
     ndpi_fill_protocol_category(ndpi_struct, flow, &proto);
   } else {
@@ -1674,6 +1832,83 @@ static int ndpi_search_quic_extra(struct ndpi_detection_module_struct *ndpi_stru
   }
 
   return 0;
+}
+
+static int is_vn(struct ndpi_detection_module_struct *ndpi_struct)
+{
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
+  u_int32_t version;
+  u_int8_t first_byte;
+  u_int8_t pub_bit1;
+  u_int8_t dest_conn_id_len, source_conn_id_len;
+
+  /* RFC 8999 6 */
+
+  /* First byte + version (4) + 2 CID lengths (set to 0) + at least one supported version */
+  if(packet->payload_packet_len < 11) {
+    return 0;
+  }
+
+  first_byte = packet->payload[0];
+  pub_bit1 = ((first_byte & 0x80) != 0);
+  if(!pub_bit1) {
+    NDPI_LOG_DBG2(ndpi_struct, "Not a long header\n");
+    return 0;
+  }
+
+  version = ntohl(*((u_int32_t *)&packet->payload[1]));
+  if(version != 0) {
+    NDPI_LOG_DBG2(ndpi_struct, "Invalid version 0x%x\n", version);
+    return 0;
+  }
+
+  /* Check that CIDs lengths are valid: QUIC limits the CID length to 20 */
+  dest_conn_id_len = packet->payload[5];
+  if(5 + 1 + dest_conn_id_len >= packet->payload_packet_len) {
+    NDPI_LOG_DBG2(ndpi_struct, "Invalid Length %d\n", packet->payload_packet_len);
+    return 0;
+  }
+  source_conn_id_len = packet->payload[5 + 1 + dest_conn_id_len];
+  if (dest_conn_id_len > QUIC_MAX_CID_LENGTH ||
+      source_conn_id_len > QUIC_MAX_CID_LENGTH) {
+    NDPI_LOG_DBG2(ndpi_struct, "Invalid CIDs length %u %u",
+		  dest_conn_id_len, source_conn_id_len);
+    return 0;
+  }
+
+  return 1;
+}
+
+static int ndpi_search_quic_extra_vn(struct ndpi_detection_module_struct *ndpi_struct,
+				     struct ndpi_flow_struct *flow)
+{
+  struct ndpi_packet_struct *packet = &ndpi_struct->packet;
+
+  /* We are elaborating a packet following the Forcing VN, i.e. we are expecting:
+     1) first a VN packet (from the server)
+     2) then a "standard" Initial from the client */
+  /* TODO: could we unify ndpi_search_quic() and ndpi_search_quic_extra_vn() somehow? */
+
+  NDPI_LOG_DBG(ndpi_struct, "search QUIC extra func VN\n");
+
+  if(packet->payload_packet_len == 0)
+    return 1; /* Keep going */
+
+  if(flow->l4.udp.quic_vn_pair == 0) {
+    if(is_vn(ndpi_struct)) {
+      NDPI_LOG_DBG(ndpi_struct, "Valid VN\n");
+      flow->l4.udp.quic_vn_pair = 1;
+      return 1;
+    } else {
+      NDPI_LOG_DBG(ndpi_struct, "Invalid reply to a Force VN. Stop\n");
+      flow->extra_packets_func = NULL;
+      return 0; /* Stop */
+    }
+  } else {
+    flow->extra_packets_func = NULL;
+    ndpi_search_quic(ndpi_struct, flow);
+    return 0;
+  }
 }
 
 static void ndpi_search_quic(struct ndpi_detection_module_struct *ndpi_struct,
@@ -1696,16 +1931,25 @@ static void ndpi_search_quic(struct ndpi_detection_module_struct *ndpi_struct,
    *    CHLO/ClientHello message and we need (only) it to sub-classify
    *    the flow.
    *    Detecting QUIC sessions where the first captured packet is not a
-   *    CHLO/CH is VERY hard. Let try only 1 easy case:
+   *    CHLO/CH is VERY hard. Let try only some easy cases:
    *    * out-of-order 0-RTT, i.e 0-RTT packets received before the Initial;
    *      in that case, keep looking for the Initial
+   *    * if we have only SH pkts, focus on standard case where server
+   *      port is 443 and default length of Server CID is >=8 (as it happens
+   *      with most common broswer and apps). Look for 3 consecutive SH
+   *      pkts send by the client and check their CIDs (note that
+   *      some QUIC implementations have Client CID length set to 0, so
+   *      checking pkts sent by server is useless). Since we don't know the
+   *      real CID length, use the min value 8, i.e. QUIC_SERVER_CID_HEURISTIC_LENGTH
+   *    * with only GQUIC packets from server (usefull with unidirectional
+   *      captures) look for Rejection packet
    *    Avoid the generic cases and let's see if anyone complains...
    */
 
   is_initial_quic = may_be_initial_pkt(ndpi_struct, &version);
   if(!is_initial_quic) {
     if(!is_ch_reassembler_pending(flow)) { /* Better safe than sorry */
-      ret = may_be_0rtt(ndpi_struct, flow);
+      ret = may_be_0rtt(ndpi_struct, &version);
       if(ret == 1) {
         NDPI_LOG_DBG(ndpi_struct, "Found 0-RTT, keep looking for Initial\n");
         flow->l4.udp.quic_0rtt_found = 1;
@@ -1713,16 +1957,38 @@ static void ndpi_search_quic(struct ndpi_detection_module_struct *ndpi_struct,
           /* We haven't still found an Initial.. give up */
           NDPI_LOG_INFO(ndpi_struct, "QUIC 0RTT\n");
           ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_QUIC, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+          flow->protos.tls_quic.quic_version = version;
         }
         return;
       } else if(flow->l4.udp.quic_0rtt_found == 1) {
         /* Unknown packet (probably an Handshake one) after a 0-RTT */
         NDPI_LOG_INFO(ndpi_struct, "QUIC 0RTT (without Initial)\n");
         ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_QUIC, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+        flow->protos.tls_quic.quic_version = 0; /* unknown */
         return;
       }
+      ret = may_be_sh(ndpi_struct, flow);
+      if(ret == 1) {
+        NDPI_LOG_INFO(ndpi_struct, "SH Quic\n");
+        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_QUIC, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+        flow->protos.tls_quic.quic_version = 0; /* unknown */
+	return;
+      }
+      if(ret == -1) {
+        NDPI_LOG_DBG2(ndpi_struct, "Keep looking for SH by client\n");
+        if(flow->packet_counter > 10 /* TODO */)
+          NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
+	return;
+      }
+      ret = may_be_gquic_rej(ndpi_struct);
+      if(ret == 1) {
+        NDPI_LOG_INFO(ndpi_struct, "GQUIC REJ\n");
+        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_QUIC, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+        flow->protos.tls_quic.quic_version = 0; /* unknown */
+	return;
+      }
     }
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -1732,6 +1998,7 @@ static void ndpi_search_quic(struct ndpi_detection_module_struct *ndpi_struct,
 
   NDPI_LOG_INFO(ndpi_struct, "found QUIC\n");
   ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_QUIC, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+  flow->protos.tls_quic.quic_version = version;
 
   /*
    * 3) Skip not supported versions
@@ -1739,23 +2006,37 @@ static void ndpi_search_quic(struct ndpi_detection_module_struct *ndpi_struct,
 
   if(!is_version_supported(version)) {
     NDPI_LOG_DBG(ndpi_struct, "Unsupported version 0x%x\n", version);
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
+    return;
+  }
+
+  /*
+   * 3a) Forcing VN. There is no payload to analyze yet.
+   * Expecteed flow:
+   *  *) C->S: Forcing VN
+   *  *) S->C: VN
+   *  *) C->S: "Standard" Initial with crypto data
+   */
+  if(is_version_forcing_vn(version)) {
+    NDPI_LOG_DBG(ndpi_struct, "Forcing VN\n");
+    flow->max_extra_packets_to_check = 4; /* TODO */
+    flow->extra_packets_func = ndpi_search_quic_extra_vn;
     return;
   }
 
   /*
    * 4) Extract the Payload from Initial Packets
    */
-  clear_payload = get_clear_payload(ndpi_struct, version, &clear_payload_len);
+  clear_payload = get_clear_payload(ndpi_struct, flow, version, &clear_payload_len);
   if(!clear_payload) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
   /*
    * 5) Extract Crypto Data from the Payload
    */
-  crypto_data = get_crypto_data(ndpi_struct, flow, version,
+  crypto_data = get_crypto_data(ndpi_struct, flow,
 				clear_payload, clear_payload_len,
 				&crypto_data_len);
 
@@ -1766,7 +2047,7 @@ static void ndpi_search_quic(struct ndpi_detection_module_struct *ndpi_struct,
     if(!is_version_with_tls(version)) {
       process_chlo(ndpi_struct, flow, crypto_data, crypto_data_len);
     } else {
-      process_tls(ndpi_struct, flow, crypto_data, crypto_data_len, version);
+      process_tls(ndpi_struct, flow, crypto_data, crypto_data_len);
     }
   }
   if(is_version_with_encrypted_header(version)) {
@@ -1776,23 +2057,20 @@ static void ndpi_search_quic(struct ndpi_detection_module_struct *ndpi_struct,
   /*
    * 7) We need to process other packets than (the first) ClientHello/CHLO?
    */
-  if(eval_extra_processing(ndpi_struct, flow, version)) {
+  if(eval_extra_processing(ndpi_struct, flow)) {
     flow->max_extra_packets_to_check = 24; /* TODO */
     flow->extra_packets_func = ndpi_search_quic_extra;
   } else if(!crypto_data) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
   }
 }
 
 /* ***************************************************************** */
 
-void init_quic_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id,
-			 NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_quic_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("QUIC", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_QUIC, ndpi_search_quic,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN, ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("QUIC", ndpi_struct,
+                     ndpi_search_quic,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_QUIC);
 }

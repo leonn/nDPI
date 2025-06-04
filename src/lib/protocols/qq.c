@@ -27,17 +27,17 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_QQ
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 
 static void ndpi_int_qq_add_connection(struct ndpi_detection_module_struct *ndpi_struct,
-				       struct ndpi_flow_struct *flow/* , */
-				       /* ndpi_protocol_type_t protocol_type */)
+				       struct ndpi_flow_struct *flow)
 {
   ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_QQ, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
 
-void ndpi_search_qq(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_qq(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
@@ -53,20 +53,15 @@ void ndpi_search_qq(struct ndpi_detection_module_struct *ndpi_struct, struct ndp
         ndpi_int_qq_add_connection(ndpi_struct, flow);
       } else {
         if(flow->num_processed_pkts > 4)
-          NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+          NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       }
 }
 
 
-void init_qq_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id,
-                       NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_qq_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("QQ", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_QQ,
-				      ndpi_search_qq,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("QQ", ndpi_struct,
+                     ndpi_search_qq,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_QQ);
 }

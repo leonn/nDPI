@@ -23,6 +23,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_TINC
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 #include "libcache.h"
 
 PACK_ON struct tinc_cache_entry {
@@ -64,7 +65,7 @@ static void ndpi_check_tinc(struct ndpi_detection_module_struct *ndpi_struct, st
       }
     }
     
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   } else if(packet->tcp != NULL) {
 
@@ -129,10 +130,10 @@ static void ndpi_check_tinc(struct ndpi_detection_module_struct *ndpi_struct, st
     }
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
-void ndpi_search_tinc(struct ndpi_detection_module_struct* ndpi_struct, struct ndpi_flow_struct* flow) {
+static void ndpi_search_tinc(struct ndpi_detection_module_struct* ndpi_struct, struct ndpi_flow_struct* flow) {
   NDPI_LOG_DBG(ndpi_struct, "tinc detection\n");
 
   if(flow->detected_protocol_stack[0] != NDPI_PROTOCOL_TINC) {
@@ -140,15 +141,11 @@ void ndpi_search_tinc(struct ndpi_detection_module_struct* ndpi_struct, struct n
   }
 }
 
-void init_tinc_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_tinc_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("TINC", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_TINC,
-				      ndpi_search_tinc,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION, /* TODO: IPv6? */
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("TINC", ndpi_struct,
+                     ndpi_search_tinc,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION, /* TODO: IPv6? */
+                     1, NDPI_PROTOCOL_TINC);
 }
 

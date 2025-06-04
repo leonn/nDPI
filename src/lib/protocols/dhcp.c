@@ -23,6 +23,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_DHCP
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 /* freeradius/src/lib/dhcp.c */
 #define DHCP_CHADDR_LEN	6
@@ -70,8 +71,8 @@ static int is_dhcp_magic(uint8_t *magic) {
     return(0);
 }
 
-void ndpi_search_dhcp_udp(struct ndpi_detection_module_struct *ndpi_struct,
-			  struct ndpi_flow_struct *flow) {
+static void ndpi_search_dhcp_udp(struct ndpi_detection_module_struct *ndpi_struct,
+				 struct ndpi_flow_struct *flow) {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int8_t msg_type = 0;
 
@@ -87,7 +88,7 @@ void ndpi_search_dhcp_udp(struct ndpi_detection_module_struct *ndpi_struct,
        && (packet->udp->source == htons(67) || packet->udp->source == htons(68))
        && (packet->udp->dest == htons(67) || packet->udp->dest == htons(68))
        && is_dhcp_magic(dhcp->magic)) {	   
-      u_int i = 0, foundValidMsgType = 0;
+      u_int i = 0, foundValidMsgType = 0, opt_offset = 0;
 
       u_int dhcp_options_size = ndpi_min(DHCP_VEND_LEN /* maximum size of options in struct dhcp_packet */,
 					 packet->payload_packet_len - 240);
@@ -95,10 +96,10 @@ void ndpi_search_dhcp_udp(struct ndpi_detection_module_struct *ndpi_struct,
 
       /* Parse options in two steps (since we need first the message type and
          it seems there is no specific order in the options list) */
-
+      
       /* First iteration: search for the message type */
       while(i + 1 /* for the len */ < dhcp_options_size) {
-        u_int8_t id  = dhcp->options[i];
+        u_int8_t id  = dhcp->options[i];		
 
         if(id == 0xFF)
           break;
@@ -126,7 +127,7 @@ void ndpi_search_dhcp_udp(struct ndpi_detection_module_struct *ndpi_struct,
 #ifdef DHCP_DEBUG
         NDPI_LOG_DBG2(ndpi_struct, "[DHCP] Invalid message type %d. Not dhcp\n", msg_type);
 #endif
-        NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+        NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
         return;
       }
 
@@ -141,27 +142,34 @@ void ndpi_search_dhcp_udp(struct ndpi_detection_module_struct *ndpi_struct,
         if(id == 0xFF)
          break;
         else {
+	  int rc;	  
           /* Prevent malformed packets to cause out-of-bounds accesses */
           u_int8_t len = ndpi_min(dhcp->options[i+1] /* len as found in the packet */,
 				  dhcp_options_size - (i+2) /* 1 for the type and 1 for the value */);
 
-          if(len == 0)
+          if(len == 0 || opt_offset >= sizeof(flow->protos.dhcp.options))
             break;
+
+	  rc = ndpi_snprintf((char*)&flow->protos.dhcp.options[opt_offset],
+			     sizeof(flow->protos.dhcp.options) - opt_offset,
+			     "%s%u", (i > 0) ? "," : "", id);
+	  
+	  if(rc > 0) opt_offset += rc;	
 
 #ifdef DHCP_DEBUG
           NDPI_LOG_DBG2(ndpi_struct, "[DHCP] Id=%d [len=%d]\n", id, len);
 #endif
 
           if(id == 55 /* Parameter Request List / Fingerprint */) {
-            u_int idx, offset = 0;
+            u_int idx, fing_offset = 0;
 	    
-            for(idx = 0; idx < len && offset < sizeof(flow->protos.dhcp.fingerprint) - 2; idx++) {
-              int rc = ndpi_snprintf((char*)&flow->protos.dhcp.fingerprint[offset],
-				sizeof(flow->protos.dhcp.fingerprint) - offset,
-				"%s%u", (idx > 0) ? "," : "",
-				(unsigned int)dhcp->options[i+2+idx] & 0xFF);
+            for(idx = 0; idx < len && fing_offset < sizeof(flow->protos.dhcp.fingerprint) - 2; idx++) {
+	      rc = ndpi_snprintf((char*)&flow->protos.dhcp.fingerprint[fing_offset],
+				sizeof(flow->protos.dhcp.fingerprint) - fing_offset,
+				 "%s%u", (idx > 0) ? "," : "",
+				 (unsigned int)dhcp->options[i+2+idx] & 0xFF);
 	      
-              if(rc < 0) break; else offset += rc;
+              if(rc < 0) break; else fing_offset += rc;
             }
 	    
             flow->protos.dhcp.fingerprint[sizeof(flow->protos.dhcp.fingerprint) - 1] = '\0';
@@ -179,25 +187,21 @@ void ndpi_search_dhcp_udp(struct ndpi_detection_module_struct *ndpi_struct,
             NDPI_LOG_DBG2(ndpi_struct, "[DHCP] '%.*s'\n",name,len);
 	      //	    while(j < len) { printf( "%c", name[j]); j++; }; printf("\n");
 #endif
-            ndpi_hostname_sni_set(flow, name, len);
+            ndpi_hostname_sni_set(flow, name, len, NDPI_HOSTNAME_NORM_ALL);
 	  }
 
           i += len + 2;
         }
       }
-    }
-  } else
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    } else
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
+  }
 }
 
 
-void init_dhcp_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-			 u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask) {
-  ndpi_set_bitmask_protocol_detection("DHCP", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_DHCP,
-				      ndpi_search_dhcp_udp,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_UDP_WITH_PAYLOAD,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-  *id += 1;
+void init_dhcp_dissector(struct ndpi_detection_module_struct *ndpi_struct) {
+  register_dissector("DHCP", ndpi_struct,
+                     ndpi_search_dhcp_udp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_DHCP);
 }

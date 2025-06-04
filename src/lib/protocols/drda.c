@@ -22,6 +22,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_DRDA
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 struct ndpi_drda_hdr {
   u_int16_t length;
@@ -33,8 +34,8 @@ struct ndpi_drda_hdr {
 };
 
 
-void ndpi_search_drda(struct ndpi_detection_module_struct *ndpi_struct,
-		      struct ndpi_flow_struct *flow)
+static void ndpi_search_drda(struct ndpi_detection_module_struct *ndpi_struct,
+			     struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct * packet = &ndpi_struct->packet;
   u_int16_t payload_len = packet->payload_packet_len;
@@ -82,22 +83,17 @@ void ndpi_search_drda(struct ndpi_detection_module_struct *ndpi_struct,
   }
 
  no_drda:
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 
 /* ***************************************************************** */
 
 
-void init_drda_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id,
-			 NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_drda_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("DRDA", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_DRDA,
-				      ndpi_search_drda,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("DRDA", ndpi_struct,
+                     ndpi_search_drda,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_DRDA);
 }

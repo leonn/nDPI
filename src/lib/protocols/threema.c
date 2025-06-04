@@ -1,9 +1,9 @@
 /*
  * threema.c
  *
- * Copyright (C) 2022 - ntop.org
+ * Copyright (C) 2022-23 - ntop.org
  *
- * nDPI is free software: you can zmqtribute it and/or modify
+ * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
@@ -22,6 +22,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_THREEMA
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 
 static void ndpi_int_threema_add_connection(struct ndpi_detection_module_struct * const ndpi_struct,
@@ -42,7 +43,7 @@ static void ndpi_search_threema(struct ndpi_detection_module_struct *ndpi_struct
   NDPI_LOG_DBG(ndpi_struct, "search Threema\n");
 
   if (ntohs(packet->tcp->source) != 5222 && ntohs(packet->tcp->dest) != 5222) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -51,19 +52,19 @@ static void ndpi_search_threema(struct ndpi_detection_module_struct *ndpi_struct
     case 1:
       if (packet->payload_packet_len != 48)
       {
-        NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+        NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       }
       return;
     case 2:
       if (packet->payload_packet_len != 80)
       {
-        NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+        NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       }
       return;
     case 3:
       if (packet->payload_packet_len != 191)
       {
-        NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+        NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       }
       return;
     case 4:
@@ -74,30 +75,24 @@ static void ndpi_search_threema(struct ndpi_detection_module_struct *ndpi_struct
 
   if (packet->payload_packet_len < 2)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
   uint16_t len = le16toh(get_u_int16_t(packet->payload, 0));
   if (len + 2 != packet->payload_packet_len)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
   ndpi_int_threema_add_connection(ndpi_struct, flow);
 }
 
-void init_threema_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-                            u_int32_t *id,
-                            NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_threema_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("Threema", ndpi_struct, detection_bitmask, *id,
-    NDPI_PROTOCOL_THREEMA,
-    ndpi_search_threema,
-    NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-    SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-    ADD_TO_DETECTION_BITMASK
-  );
-  *id += 1;
+  register_dissector("Threema", ndpi_struct,
+                     ndpi_search_threema,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_THREEMA);
 }

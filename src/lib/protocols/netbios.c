@@ -1,7 +1,7 @@
 /*
  * netbios.c
  *
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  * Copyright (C) 2009-11 - ipoque GmbH
  *
  * This file is part of nDPI, an open source deep packet inspection
@@ -28,6 +28,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_NETBIOS
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 /* ****************************************************************** */
 
@@ -102,9 +103,9 @@ static void ndpi_int_netbios_add_connection(struct ndpi_detection_module_struct 
   if((off < packet->payload_packet_len)
      && ndpi_netbios_name_interpret((unsigned char*)&packet->payload[off],
 		 (u_int)(packet->payload_packet_len - off), name, sizeof(name)-1) > 0) {
-      ndpi_hostname_sni_set(flow, (const u_int8_t *)name, strlen((char *)name));
+      ndpi_hostname_sni_set(flow, (const u_int8_t *)name, strlen((char *)name), NDPI_HOSTNAME_NORM_ALL);
 
-      ndpi_check_dga_name(ndpi_struct, flow, flow->host_server_name, 1, 1);
+      ndpi_check_dga_name(ndpi_struct, flow, flow->host_server_name, 1, 1, 0);
   }
 
   if(sub_protocol == NDPI_PROTOCOL_UNKNOWN)
@@ -115,8 +116,8 @@ static void ndpi_int_netbios_add_connection(struct ndpi_detection_module_struct 
 
 /* ****************************************************************** */
 
-void ndpi_search_netbios(struct ndpi_detection_module_struct *ndpi_struct,
-			 struct ndpi_flow_struct *flow) {
+static void ndpi_search_netbios(struct ndpi_detection_module_struct *ndpi_struct,
+				struct ndpi_flow_struct *flow) {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int16_t dport;
 
@@ -409,19 +410,15 @@ void ndpi_search_netbios(struct ndpi_detection_module_struct *ndpi_struct,
 
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 /* ****************************************************************** */
 
-void init_netbios_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_netbios_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("NETBIOS", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_NETBIOS,
-				      ndpi_search_netbios,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("NETBIOS", ndpi_struct,
+                     ndpi_search_netbios,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_NETBIOS);
 }

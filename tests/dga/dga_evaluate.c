@@ -36,10 +36,34 @@ void help() {
   exit(0);
 }
 
-
 /* *********************************************** */
 
-extern int ndpi_verbose_dga_detection;
+static int verbose_dga_detection = 0;
+
+static void ndpi_dbg_fn(u_int16_t protocol,
+                        struct ndpi_detection_module_struct *module_struct,
+                        ndpi_log_level_t log_level, const char *file,
+                        const char *func, unsigned line,
+                        const char *format, ...)
+{
+  assert(protocol == NDPI_PROTOCOL_UNKNOWN);
+  assert(module_struct != NULL);
+  /* While this program always logs at NDPI_LOG_DEBUG_EXTRA level, the
+     initialization of the library may log at any level */
+
+  (void)log_level;
+  (void)file;
+  (void)func;
+  (void)line;
+
+  if (verbose_dga_detection) {
+    va_list vl;
+
+    va_start(vl, format);
+    vprintf(format, vl);
+    va_end(vl);
+  }
+}
 
 int main(int argc, char **argv) {
   FILE *fd;
@@ -59,7 +83,7 @@ int main(int argc, char **argv) {
     verbose = 1;
     
     if(argv[3] != NULL)
-      ndpi_verbose_dga_detection = 1;
+      verbose_dga_detection = 1;
   }
   
   if (ndpi_get_api_version() != NDPI_API_VERSION) {
@@ -68,11 +92,10 @@ int main(int argc, char **argv) {
   }
 
   /* Initialize nDPI detection module*/
-  NDPI_PROTOCOL_BITMASK all;
-  struct ndpi_detection_module_struct *ndpi_str = ndpi_init_detection_module(ndpi_no_prefs);
+  struct ndpi_detection_module_struct *ndpi_str = ndpi_init_detection_module(NULL);
   assert(ndpi_str != NULL);
-  NDPI_BITMASK_SET_ALL(all);
-  ndpi_set_protocol_detection_bitmask2(ndpi_str, &all);
+  ndpi_set_config(ndpi_str, NULL, "log.level", "3"); /* NDPI_LOG_DEBUG_EXTRA */
+  set_ndpi_debug_function(ndpi_str, ndpi_dbg_fn);
   ndpi_finalize_initialization(ndpi_str);
   assert(ndpi_str != NULL);
 
@@ -80,7 +103,7 @@ int main(int argc, char **argv) {
   while(fgets(buffer, sizeof(buffer), fd) != NULL) {
     char *hostname = strtok(buffer, "\n");
     
-    if(ndpi_check_dga_name(ndpi_str, NULL, hostname, 1, 1)) {
+    if(ndpi_check_dga_name(ndpi_str, NULL, hostname, 1, 1, 0)) {
       if(verbose)
 	printf("%10s\t%s\n", "[DGA]", hostname);
 	       

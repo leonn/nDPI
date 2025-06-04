@@ -24,6 +24,7 @@
 
 #include <stdlib.h>
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static void ndpi_int_avast_securedns_add_connection(struct ndpi_detection_module_struct *ndpi_struct,
                                                     struct ndpi_flow_struct *flow)
@@ -40,7 +41,7 @@ static void ndpi_search_avast_securedns(struct ndpi_detection_module_struct *ndp
       ntohl(get_u_int32_t(packet->payload, 11)) != 0x00013209 ||
       flow->packet_counter > 1)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -50,19 +51,13 @@ static void ndpi_search_avast_securedns(struct ndpi_detection_module_struct *ndp
     return;
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
-void init_avast_securedns_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id,
-                                    NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_avast_securedns_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("AVAST SecureDNS",
-                                      ndpi_struct, detection_bitmask, *id,
-                                      NDPI_PROTOCOL_AVAST_SECUREDNS,
-                                      ndpi_search_avast_securedns,
-                                      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-                                      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-                                      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("AVAST SecureDNS", ndpi_struct,
+                     ndpi_search_avast_securedns,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_AVAST_SECUREDNS);
 }

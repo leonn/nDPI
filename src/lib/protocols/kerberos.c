@@ -1,7 +1,7 @@
 /*
  * kerberos.c
  *
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  * Copyright (C) 2009-11 - ipoque GmbH
  *
  * This file is part of nDPI, an open source deep packet inspection
@@ -27,6 +27,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_KERBEROS
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 /* #define KERBEROS_DEBUG 1 */
 
@@ -44,9 +45,9 @@ static int krb_decode_asn1_length(struct ndpi_detection_module_struct *ndpi_stru
   int64_t length;
   u_int16_t value_len;
 
-  length = ndpi_asn1_ber_decode_length(&packet->payload[*kasn1_offset],
-				       packet->payload_packet_len - *kasn1_offset,
-				       &value_len);
+  length = asn1_ber_decode_length(&packet->payload[*kasn1_offset],
+				  packet->payload_packet_len - *kasn1_offset,
+				  &value_len);
 
   if (length == -1 ||
       packet->payload_packet_len < *kasn1_offset + value_len + length)
@@ -56,7 +57,7 @@ static int krb_decode_asn1_length(struct ndpi_detection_module_struct *ndpi_stru
 
   *kasn1_offset += value_len;
 
-  return length;
+  return (int)length;
 }
 
 /* Reference: https://en.wikipedia.org/wiki/X.690#Identifier_octets */
@@ -173,7 +174,7 @@ static int krb_decode_asn1_blocks_skip(struct ndpi_detection_module_struct *ndpi
 static void krb_strncpy_lower(char * const dst, size_t dst_siz,
                               char const * const src, size_t src_siz)
 {
-  int i, dst_len = ndpi_min(src_siz, dst_siz - 1);
+  int i, dst_len = (int)ndpi_min(src_siz, dst_siz - 1);
 
    dst[dst_len] = '\0';
 
@@ -304,8 +305,8 @@ static void ndpi_int_kerberos_add_connection(struct ndpi_detection_module_struct
 
 /* ************************************************* */
 
-void ndpi_search_kerberos(struct ndpi_detection_module_struct *ndpi_struct,
-			  struct ndpi_flow_struct *flow) {
+static void ndpi_search_kerberos(struct ndpi_detection_module_struct *ndpi_struct,
+				 struct ndpi_flow_struct *flow) {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int16_t sport = packet->tcp ? ntohs(packet->tcp->source) : ntohs(packet->udp->source);
   u_int16_t dport = packet->tcp ? ntohs(packet->tcp->dest) : ntohs(packet->udp->dest);
@@ -313,7 +314,7 @@ void ndpi_search_kerberos(struct ndpi_detection_module_struct *ndpi_struct,
   u_int16_t original_payload_packet_len = 0;
 
   if((sport != KERBEROS_PORT) && (dport != KERBEROS_PORT)) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
   
@@ -417,7 +418,7 @@ void ndpi_search_kerberos(struct ndpi_detection_module_struct *ndpi_struct,
 	      || (packet->payload[koffset] == 0x1E)
 	      || (packet->payload[koffset] == 0x0D)
 	      || (packet->payload[koffset] == 0x0E))) {
-	    u_int16_t koffsetp, body_offset = 0, pad_len;
+	    u_int32_t koffsetp, body_offset = 0, pad_len;
 	    u_int8_t msg_type = packet->payload[koffset];
 
 #ifdef KERBEROS_DEBUG
@@ -486,7 +487,7 @@ void ndpi_search_kerberos(struct ndpi_detection_module_struct *ndpi_struct,
 
 		  name_offset += 1;
 		  if(name_offset < packet->payload_packet_len - 1 &&
-		     isprint(packet->payload[name_offset+1]) == 0) /* Isn't printable ? */
+		     ndpi_isprint(packet->payload[name_offset+1]) == 0) /* Isn't printable ? */
 		  {
 		    name_offset++;
 		  }
@@ -671,7 +672,7 @@ void ndpi_search_kerberos(struct ndpi_detection_module_struct *ndpi_struct,
     }
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 static int ndpi_search_kerberos_extra(struct ndpi_detection_module_struct *ndpi_struct,
@@ -696,14 +697,9 @@ static int ndpi_search_kerberos_extra(struct ndpi_detection_module_struct *ndpi_
   return flow->extra_packets_func != NULL;
 }
 
-void init_kerberos_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-			     u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask) {
-  ndpi_set_bitmask_protocol_detection("Kerberos", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_KERBEROS,
-				      ndpi_search_kerberos,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+void init_kerberos_dissector(struct ndpi_detection_module_struct *ndpi_struct) {
+  register_dissector("Kerberos", ndpi_struct,
+                     ndpi_search_kerberos,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                      1, NDPI_PROTOCOL_KERBEROS);
 }

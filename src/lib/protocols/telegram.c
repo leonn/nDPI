@@ -28,10 +28,12 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_TELEGRAM
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static void ndpi_int_telegram_add_connection(struct ndpi_detection_module_struct
-                                             *ndpi_struct, struct ndpi_flow_struct *flow) {
-  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_TELEGRAM, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+                                             *ndpi_struct, struct ndpi_flow_struct *flow,
+					     ndpi_confidence_t confidence) {
+  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_TELEGRAM, NDPI_PROTOCOL_UNKNOWN, confidence);
   NDPI_LOG_INFO(ndpi_struct, "found telegram\n");
 }
 
@@ -43,38 +45,35 @@ static u_int8_t is_telegram_port_range(u_int16_t port) {
   return(0);
 }
 
-void ndpi_search_telegram(struct ndpi_detection_module_struct *ndpi_struct,
-			  struct ndpi_flow_struct *flow) {
+static void ndpi_search_telegram(struct ndpi_detection_module_struct *ndpi_struct,
+				 struct ndpi_flow_struct *flow) {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   NDPI_LOG_DBG(ndpi_struct, "search telegram\n");
 
   if(packet->tcp != NULL) {
-    if(packet->payload_packet_len > 56) {
-      u_int16_t dport = ntohs(packet->tcp->dest);
-      /* u_int16_t sport = ntohs(packet->tcp->source); */
-
-      if(packet->payload[0] == 0xef && (dport == 443 || dport == 80 || dport == 25)) {
-        if(packet->payload[1] == 0x7f) {
-          ndpi_int_telegram_add_connection(ndpi_struct, flow);
-        } else if(packet->payload[1]*4 <= packet->payload_packet_len - 1) {
-          ndpi_int_telegram_add_connection(ndpi_struct, flow);
-        }
-        return;
-      }
+    /* With MTProto 2.0 telegram via app is no longer TLS-based (althought based on TCP/443) so
+       we need to detect it with Telegram IPs.
+       Basically, we want a fast classification by ip. Note that, real Telegram traffic over
+       TLS (i.e. Telegram Web) is correctly classified as TLS/Telegram because TLS dissector
+       already kicked in.
+       Let's check every port for the time being */
+    if(flow->guessed_protocol_id_by_ip == NDPI_PROTOCOL_TELEGRAM) {
+      ndpi_int_telegram_add_connection(ndpi_struct, flow, NDPI_CONFIDENCE_MATCH_BY_IP);
+      return;
     }
   } else if(packet->udp != NULL) {
     /*
       The latest telegram protocol
       - contains a sequence of 12 consecutive 0xFF packets
-      - it uses low UDP ports in the 500 ramge
+      - it uses low UDP ports in the 500 range
      */
 
     if(packet->payload_packet_len >= 40) {
       u_int16_t sport = ntohs(packet->udp->source), dport = ntohs(packet->udp->dest);
 
       if(is_telegram_port_range(sport) || is_telegram_port_range(dport)) {
-	u_int i=0, found = 0;
+	u_int i, found = 0;
 
 	for(i=0; i<packet->payload_packet_len; i++) {
 	  if(packet->payload[i] == 0xFF) {
@@ -93,25 +92,29 @@ void ndpi_search_telegram(struct ndpi_detection_module_struct *ndpi_struct,
 	}
 
 	if(found == 12)	{
-	  ndpi_int_telegram_add_connection(ndpi_struct, flow);
+	  ndpi_int_telegram_add_connection(ndpi_struct, flow, NDPI_CONFIDENCE_DPI);
+	  /* It seems this kind of traffic is used:
+             * for "normal" stuff (at least years ago... and now? TODO)
+             * for calls, as a custom encapsulation of STUN/DTLS/RTP packets
+             Since we are not able to tell the former from the latter, always
+             switch to STUN dissection. If we find STUN/DTLS/RTP stuff we will
+             update the classification to something like STUN/Telegram_voip,
+             otherwise it will remain Telegram */
+	  switch_extra_dissection_to_stun(ndpi_struct, flow, 0);
 	  return;
 	}
       }
     }
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 
-void init_telegram_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_telegram_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("Telegram", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_TELEGRAM,
-				      ndpi_search_telegram,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("Telegram", ndpi_struct,
+                     ndpi_search_telegram,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_TELEGRAM);
 }

@@ -24,6 +24,7 @@
 
 #include <stdlib.h>
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static void ndpi_int_avast_add_connection(struct ndpi_detection_module_struct *ndpi_struct,
                                           struct ndpi_flow_struct *flow)
@@ -38,7 +39,7 @@ static void ndpi_search_avast(struct ndpi_detection_module_struct *ndpi_struct,
 
   if (packet->payload_packet_len < 6)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -49,19 +50,13 @@ static void ndpi_search_avast(struct ndpi_detection_module_struct *ndpi_struct,
     return;
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
-void init_avast_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id,
-                          NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_avast_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("AVAST",
-                                      ndpi_struct, detection_bitmask, *id,
-                                      NDPI_PROTOCOL_AVAST,
-                                      ndpi_search_avast,
-                                      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-                                      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-                                      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("AVAST", ndpi_struct,
+                     ndpi_search_avast,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_AVAST);
 }

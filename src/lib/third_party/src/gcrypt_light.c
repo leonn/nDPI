@@ -1,6 +1,6 @@
 
 #include <stdint.h>
-#ifndef WIN32
+#if !defined(WIN32) && !defined(_MSC_VER)
 #include <unistd.h>
 #endif
 #include <string.h>
@@ -22,7 +22,7 @@
 /****************************/
 
 #define mbedtls_calloc    ndpi_calloc
-#define mbedtls_free       ndpi_free
+#define mbedtls_free      ndpi_free
 
 #include "gcrypt_light.h"
 
@@ -103,7 +103,9 @@ char *gpg_strerror_r(gcry_error_t err,char *buf, size_t buflen) {
 }
 
 int gcry_control (int ctl,int val) {
-    if(ctl == GCRYCTL_INITIALIZATION_FINISHED) return GPG_ERR_NO_ERROR;
+    if(ctl == GCRYCTL_INITIALIZATION_FINISHED ||
+       (ctl == 1 && val == 0) /* GCRYCTL_INITIALIZATION_FINISHED_P */)
+        return GPG_ERR_NO_ERROR;
     return MBEDTLS_ERR_NOT_SUPPORT;
 }
 
@@ -114,7 +116,7 @@ const char *gcry_check_version(void *unused) {
 gcry_error_t gcry_md_open(gcry_md_hd_t *h,int algo,int flags) {
     gcry_md_hd_t ctx;
     if(!(algo == GCRY_MD_SHA256 && flags == GCRY_MD_FLAG_HMAC)) return MBEDTLS_ERR_MD_NOT_SUPPORT;
-    ctx = ndpi_calloc(1,sizeof(struct gcry_md_hd));
+    ctx = (gcry_md_hd_t)ndpi_calloc(1,sizeof(struct gcry_md_hd));
     if(!ctx) return MBEDTLS_ERR_MD_ALLOC_FAILED;
     *h = ctx;
     return GPG_ERR_NO_ERROR;
@@ -131,13 +133,15 @@ void gcry_md_reset(gcry_md_hd_t h) {
 gcry_error_t gcry_md_setkey(gcry_md_hd_t h,const uint8_t *key,size_t key_len) {
     if(h->key_len) return MBEDTLS_ERR_MD_REKEY;
     h->key_len = key_len <= sizeof(h->key) ? key_len : sizeof(h->key);
-    memcpy(h->key,key,h->key_len);
+    if(h->key_len > 0)
+        memcpy(h->key,key,h->key_len);
     return GPG_ERR_NO_ERROR;
 }
 
 gcry_error_t gcry_md_write(gcry_md_hd_t h,const uint8_t *data,size_t data_len) {
     if(h->data_len + data_len > GCRY_MD_BUFF_SIZE) return  MBEDTLS_ERR_MD_DATA_TOO_BIG;
-    memcpy(&h->data_buf[h->data_len],data,data_len);
+    if(data_len > 0)
+        memcpy(&h->data_buf[h->data_len],data,data_len);
     h->data_len += data_len;
     return GPG_ERR_NO_ERROR;
 }
@@ -172,11 +176,11 @@ gcry_error_t gcry_cipher_open (gcry_cipher_hd_t *handle,
 struct gcry_cipher_hd *r = 0;
 size_t s_len = ROUND_SIZE8(sizeof(struct gcry_cipher_hd));;
 
-    if(flags || algo != GCRY_CIPHER_AES128 || !( mode == GCRY_CIPHER_MODE_ECB || mode == GCRY_CIPHER_MODE_GCM)) return MBEDTLS_ERR_CIPHER_FEATURE_UNAVAILABLE;
+    if(flags || algo != GCRY_CIPHER_AES128) return MBEDTLS_ERR_CIPHER_FEATURE_UNAVAILABLE;
 
     switch(mode) {
         case GCRY_CIPHER_MODE_ECB:
-            r = ndpi_calloc(1,s_len + sizeof(mbedtls_aes_context));
+            r = (struct gcry_cipher_hd *)ndpi_calloc(1,s_len + sizeof(mbedtls_aes_context));
             if(!r) return MBEDTLS_ERR_CIPHER_ALLOC_FAILED;
             r->ctx.ecb = (mbedtls_aes_context *)(r+1);
             mbedtls_aes_init(r->ctx.ecb);
@@ -186,7 +190,7 @@ size_t s_len = ROUND_SIZE8(sizeof(struct gcry_cipher_hd));;
             size_t aes_ctx_size = ROUND_SIZE8(sizeof( mbedtls_aes_context ));
             size_t gcm_ctx_size = ROUND_SIZE8(sizeof( mbedtls_gcm_context ));
 
-            r = ndpi_calloc(1,s_len + gcm_ctx_size + aes_ctx_size);
+            r = (struct gcry_cipher_hd *)ndpi_calloc(1,s_len + gcm_ctx_size + aes_ctx_size);
             if(!r) return MBEDTLS_ERR_CIPHER_ALLOC_FAILED;
             r->ctx.gcm = (mbedtls_gcm_context *)(r+1);
             mbedtls_gcm_init(r->ctx.gcm,(void *)(((char *)(r+1)) + gcm_ctx_size));
@@ -248,10 +252,10 @@ gcry_error_t gcry_cipher_setkey (gcry_cipher_hd_t h, const void *key, size_t key
     if( keylen != gcry_cipher_get_algo_keylen(h->algo)) return MBEDTLS_ERR_CIPHER_BAD_KEY;
     switch(h->mode) {
         case GCRY_CIPHER_MODE_ECB:
-            r = mbedtls_aes_setkey_enc( h->ctx.ecb,  key, keylen*8 );
+            r = mbedtls_aes_setkey_enc( h->ctx.ecb, (const unsigned char *)key, keylen*8 );
             break;
         case GCRY_CIPHER_MODE_GCM:
-            r = mbedtls_gcm_setkey( h->ctx.gcm, MBEDTLS_CIPHER_ID_AES, key, keylen*8 );
+            r = mbedtls_gcm_setkey( h->ctx.gcm, MBEDTLS_CIPHER_ID_AES, (const unsigned char *)key, keylen*8 );
             break;
     }
     if(!r) {
@@ -283,7 +287,8 @@ gcry_error_t gcry_cipher_authenticate (gcry_cipher_hd_t h, const void *abuf, siz
             if(abuflen > sizeof(h->auth)) return MBEDTLS_ERR_CIPHER_BAD_KEY;
             h->s_auth = 1;
             h->authlen = abuflen;
-            memcpy(h->auth,abuf,abuflen);
+            if(abuflen > 0)
+	        memcpy(h->auth,abuf,abuflen);
             return 0;
     }
     return MBEDTLS_ERR_CIPHER_FEATURE_UNAVAILABLE;
@@ -296,7 +301,7 @@ gcry_error_t gcry_cipher_checktag (gcry_cipher_hd_t h, const void *intag, size_t
             if(h->s_crypt_ok && h->taglen == taglen) {
                 size_t i;
                 int diff;
-                const uint8_t *ctag = intag;
+                const uint8_t *ctag = (const uint8_t *)intag;
                 for( diff = 0, i = 0; i < taglen; i++ )
                     diff |= ctag[i] ^ h->tag[i];
                 if(!diff) return 0;
@@ -324,7 +329,7 @@ static gcry_error_t _gcry_cipher_crypt (gcry_cipher_hd_t h,
     if(check_valid_algo_mode(h)) return MBEDTLS_ERR_CIPHER_FEATURE_UNAVAILABLE;
     if(!inlen && !outsize) return MBEDTLS_ERR_GCM_BAD_INPUT;
     if(!in && !inlen) {
-        src = ndpi_malloc(outsize);
+        src = (uint8_t *)ndpi_malloc(outsize);
         if(!src) return MBEDTLS_ERR_GCM_ALLOC_FAILED;
         srclen = outsize;
         memcpy(src,out,outsize);
@@ -336,18 +341,24 @@ static gcry_error_t _gcry_cipher_crypt (gcry_cipher_hd_t h,
             if(!encrypt) return MBEDTLS_ERR_GCM_NOT_SUPPORT;
             if(!( h->s_key && !h->s_crypt_ok)) return MBEDTLS_ERR_AES_MISSING_KEY;
             rv = mbedtls_aes_crypt_ecb(h->ctx.ecb, MBEDTLS_AES_ENCRYPT,
-                        src ? src:in, out);
+                        src ? src:(const unsigned char *)in, (unsigned char *)out);
             break;
         case GCRY_CIPHER_MODE_GCM:
-            if(encrypt) return MBEDTLS_ERR_GCM_NOT_SUPPORT;
-            if(!( h->s_key && h->s_auth && h->s_iv && !h->s_crypt_ok)) return MBEDTLS_ERR_GCM_MISSING_KEY;
+            if(encrypt) {
+                ndpi_free(src);
+                return MBEDTLS_ERR_GCM_NOT_SUPPORT;
+            }
+            if(!( h->s_key && h->s_auth && h->s_iv && !h->s_crypt_ok)) {
+                ndpi_free(src);
+                return MBEDTLS_ERR_GCM_MISSING_KEY;
+            }
             h->taglen = 16;
             rv = mbedtls_gcm_crypt_and_tag(h->ctx.gcm,
                         MBEDTLS_GCM_DECRYPT,
                         src ? srclen:outsize,
                         h->iv,h->ivlen,
                         h->auth,h->authlen,
-                        src ? src:in,out,
+                        src ? src:(const unsigned char *)in, (unsigned char *)out,
                         h->taglen, h->tag);
             break;
     }

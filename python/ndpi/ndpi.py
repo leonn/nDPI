@@ -1,7 +1,7 @@
 """
 ------------------------------------------------------------------------------------------------------------------------
 ndpi.py
-Copyright (C) 2011-22 - ntop.org
+Copyright (C) 2011-24 - ntop.org
 This file is part of nDPI, an open source deep packet inspection library.
 nDPI is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public
 License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
@@ -32,7 +32,7 @@ class NDPI(object):
                  "_detection_module")
 
     def __init__(self):
-        self._detection_module = lib.ndpi_init_detection_module(0)
+        self._detection_module = lib.ndpi_init_detection_module(ffi.NULL)
         if self._detection_module == ffi.NULL:
             raise MemoryError("Unable to instantiate NDPI object")
         lib.ndpi_py_setup_detection_module(self._detection_module)
@@ -53,18 +53,17 @@ class NDPI(object):
                                               int(packet_time_ms),
                                               input_info)
         return ndpi_protocol(C=p,
-                             master_protocol=p.master_protocol,
-                             app_protocol=p.app_protocol,
+                             master_protocol=p.proto.master_protocol,
+                             app_protocol=p.proto.app_protocol,
                              category=p.category)
 
-    def giveup(self, flow, enable_guess=True):
+    def giveup(self, flow):
         p = lib.ndpi_detection_giveup(self._detection_module,
                                       flow.C,
-                                      enable_guess,
                                       ffi.new("uint8_t*", 0))
         return ndpi_protocol(C=p,
-                             master_protocol=p.master_protocol,
-                             app_protocol=p.app_protocol,
+                             master_protocol=p.proto.master_protocol,
+                             app_protocol=p.proto.app_protocol,
                              category=p.category)
 
     def protocol_name(self, protocol):

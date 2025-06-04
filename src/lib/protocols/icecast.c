@@ -2,7 +2,7 @@
  * icecast.c
  *
  * Copyright (C) 2009-11 - ipoque GmbH
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -27,13 +27,14 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_ICECAST
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static void ndpi_int_icecast_add_connection(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_ICECAST, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
-void ndpi_search_icecast_tcp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_icecast_tcp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int16_t i;
@@ -43,7 +44,7 @@ void ndpi_search_icecast_tcp(struct ndpi_detection_module_struct *ndpi_struct, s
   if((packet->payload_packet_len < 500 &&
        packet->payload_packet_len >= 7 && memcmp(packet->payload, "SOURCE ", 7) == 0)
       || flow->l4.tcp.icecast_stage) {
-    ndpi_parse_packet_line_info_any(ndpi_struct, flow);
+    ndpi_parse_packet_line_info_any(ndpi_struct);
     NDPI_LOG_DBG2(ndpi_struct, "Icecast lines=%d\n", packet->parsed_lines);
     for (i = 0; i < packet->parsed_lines; i++) {
       if(packet->line[i].ptr != NULL && packet->line[i].len > 4
@@ -60,12 +61,12 @@ void ndpi_search_icecast_tcp(struct ndpi_detection_module_struct *ndpi_struct, s
     }
   }
 
-  if(ndpi_current_pkt_from_client_to_server(packet, flow)
+  if(current_pkt_from_client_to_server(ndpi_struct, flow)
       && (flow->packet_counter < 10)) {
     return;
   }
 
-  if(ndpi_current_pkt_from_server_to_client(packet, flow)) {
+  if(current_pkt_from_server_to_client(ndpi_struct, flow)) {
     /* server answer, now test Server for Icecast */
 
     ndpi_parse_packet_line_info(ndpi_struct, flow);
@@ -83,18 +84,14 @@ void ndpi_search_icecast_tcp(struct ndpi_detection_module_struct *ndpi_struct, s
     }
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 
-void init_icecast_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_icecast_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("IceCast", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_ICECAST,
-				      ndpi_search_icecast_tcp,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("IceCast", ndpi_struct,
+                     ndpi_search_icecast_tcp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_ICECAST);
 }

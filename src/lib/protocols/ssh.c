@@ -1,7 +1,7 @@
 /*
  * ssh.c
  *
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  * Copyright (C) 2009-11 - ipoque GmbH
  *
  * This file is part of nDPI, an open source deep packet inspection
@@ -27,6 +27,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_SSH
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 #include "ndpi_md5.h"
 
 #include <string.h>
@@ -68,12 +69,9 @@ typedef struct {
 /* ************************************************************************ */
 
 static void ssh_analyze_signature_version(struct ndpi_detection_module_struct *ndpi_struct,
-					  struct ndpi_flow_struct *flow,
+                                          struct ndpi_flow_struct *flow,
 					  char *str_to_check,
 					  u_int8_t is_client_signature) {
-
-  if(str_to_check == NULL) return;
-  
   u_int i;
   u_int8_t obsolete_ssh_version = 0;  
   const ssh_pattern ssh_servers_strings[] =
@@ -114,15 +112,15 @@ static void ssh_analyze_signature_version(struct ndpi_detection_module_struct *n
   }
   
   if(obsolete_ssh_version)
-    NDPI_SET_BIT(flow->risk,
-		 is_client_signature ? NDPI_SSH_OBSOLETE_CLIENT_VERSION_OR_CIPHER :
-		 NDPI_SSH_OBSOLETE_SERVER_VERSION_OR_CIPHER);
+    ndpi_set_risk(ndpi_struct, flow,
+                  (is_client_signature ? NDPI_SSH_OBSOLETE_CLIENT_VERSION_OR_CIPHER : NDPI_SSH_OBSOLETE_SERVER_VERSION_OR_CIPHER),
+                  NULL);
 }
   
 /* ************************************************************************ */
 
 static void ssh_analyse_cipher(struct ndpi_detection_module_struct *ndpi_struct,
-			       struct ndpi_flow_struct *flow,
+                               struct ndpi_flow_struct *flow,
 			       char *ciphers, u_int cipher_len,
 			       u_int8_t is_client_signature) {
 
@@ -218,7 +216,7 @@ static void ndpi_int_ssh_add_connection(struct ndpi_detection_module_struct
 /* ************************************************************************ */
 
 static u_int16_t concat_hash_string(struct ndpi_detection_module_struct *ndpi_struct,
-				    struct ndpi_flow_struct *flow,
+                                    struct ndpi_flow_struct *flow,
 				    struct ndpi_packet_struct *packet,
 				    char *buf, u_int8_t client_hash) {
   u_int32_t offset = 22, len, buf_out_len = 0, max_payload_len = packet->payload_packet_len-sizeof(u_int32_t);
@@ -364,7 +362,6 @@ static u_int16_t concat_hash_string(struct ndpi_detection_module_struct *ndpi_st
 
   if(len > len_max)
     goto invalid_payload;
-  offset += len;
 
   /* ssh.languages_client_to_server [None] */
 
@@ -443,7 +440,7 @@ static void ndpi_search_ssh_tcp(struct ndpi_detection_module_struct *ndpi_struct
 #endif
       
       NDPI_LOG_DBG2(ndpi_struct, "ssh stage 1 passed\n");
-      flow->guessed_protocol_id = NDPI_PROTOCOL_SSH;
+      flow->fast_callback_protocol_id = NDPI_PROTOCOL_SSH;
       
 #ifdef SSH_DEBUG
       printf("[SSH] [completed stage: %u]\n", flow->l4.tcp.ssh_stage);
@@ -481,7 +478,11 @@ static void ndpi_search_ssh_tcp(struct ndpi_detection_module_struct *ndpi_struct
 	    printf("]\n");
 	  }
 #endif
-	  for(i=0; i<16; i++) sprintf(&flow->protos.ssh.hassh_client[i*2], "%02X", fingerprint_client[i] & 0xFF);
+	  for(i=0; i<16; i++)
+	    snprintf(&flow->protos.ssh.hassh_client[i*2],
+		     sizeof(flow->protos.ssh.hassh_client) - (i*2),
+		     "%02X", fingerprint_client[i] & 0xFF);
+	  
 	  flow->protos.ssh.hassh_client[32] = '\0';
 	} else {
 	  u_char fingerprint_server[16];
@@ -500,7 +501,10 @@ static void ndpi_search_ssh_tcp(struct ndpi_detection_module_struct *ndpi_struct
 	  }
 #endif
 
-	  for(i=0; i<16; i++) sprintf(&flow->protos.ssh.hassh_server[i*2], "%02X", fingerprint_server[i] & 0xFF);
+	  for(i=0; i<16; i++)
+	    snprintf(&flow->protos.ssh.hassh_server[i*2],
+		     sizeof(flow->protos.ssh.hassh_server) - (i*2),
+		     "%02X", fingerprint_server[i] & 0xFF);
 	  flow->protos.ssh.hassh_server[32] = '\0';
 	}
 
@@ -525,19 +529,15 @@ static void ndpi_search_ssh_tcp(struct ndpi_detection_module_struct *ndpi_struct
 #endif
 
   NDPI_LOG_DBG(ndpi_struct, "excluding ssh at stage %d\n", flow->l4.tcp.ssh_stage);
-  NDPI_ADD_PROTOCOL_TO_BITMASK(flow->excluded_protocol_bitmask, NDPI_PROTOCOL_SSH);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 /* ************************************************************************ */
 
-void init_ssh_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_ssh_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("SSH", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_SSH,
-				      ndpi_search_ssh_tcp,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("SSH", ndpi_struct,
+                     ndpi_search_ssh_tcp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_SSH);
 }

@@ -1,7 +1,7 @@
 /*
  * collectd.c
  *
- * Copyright (C) 2022 - ntop.org
+ * Copyright (C) 2022-23 - ntop.org
  *
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -24,6 +24,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_COLLECTD
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 #define COLLECTD_MIN_BLOCKS_REQUIRED 3
 #define COLLECTD_MAX_BLOCKS_TO_DISSECT 5
@@ -100,16 +101,15 @@ static int ndpi_int_collectd_check_type(u_int16_t block_type)
   return 1;
 }
 
-static int ndpi_int_collectd_dissect_hostname(struct ndpi_flow_struct * const flow,
-                                              struct ndpi_packet_struct const * const packet,
-                                              u_int16_t block_offset, u_int16_t block_length)
+static void ndpi_int_collectd_dissect_hostname(struct ndpi_flow_struct * const flow,
+                                               struct ndpi_packet_struct const * const packet,
+                                               u_int16_t block_length)
 {
-  return (ndpi_hostname_sni_set(flow, &packet->payload[4], block_length) == NULL);
+  ndpi_hostname_sni_set(flow, &packet->payload[4], block_length, NDPI_HOSTNAME_NORM_ALL);
 }
 
 static int ndpi_int_collectd_dissect_username(struct ndpi_flow_struct * const flow,
-                                              struct ndpi_packet_struct const * const packet,
-                                              u_int16_t block_offset)
+                                              struct ndpi_packet_struct const * const packet)
 {
   u_int16_t username_length = ntohs(get_u_int16_t(packet->payload, 4));
 
@@ -127,13 +127,13 @@ static int ndpi_int_collectd_dissect_username(struct ndpi_flow_struct * const fl
   return 0;
 }
 
-void ndpi_search_collectd(struct ndpi_detection_module_struct *ndpi_struct,
-                          struct ndpi_flow_struct *flow)
+static void ndpi_search_collectd(struct ndpi_detection_module_struct *ndpi_struct,
+                                 struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct const * const packet = &ndpi_struct->packet;
   u_int16_t num_blocks;
   u_int16_t block_offset = 0, block_type, block_length;
-  u_int16_t hostname_offset, hostname_length = 0;
+  u_int16_t hostname_length = 0;
 
   NDPI_LOG_DBG(ndpi_struct, "search collectd\n");
 
@@ -157,8 +157,8 @@ void ndpi_search_collectd(struct ndpi_detection_module_struct *ndpi_struct,
          * Dissect the hostname later, when we are sure that it is
          * the collectd protocol.
          */
-        hostname_offset = block_offset;
-        hostname_length = block_length;
+        if(block_length > 4)
+          hostname_length = block_length - 4; /* Ignore type and length fields */
       } else if (block_type == COLELCTD_TYPE_ENCR_AES256) {
         /*
          * The encrypted data block is a special case.
@@ -167,9 +167,9 @@ void ndpi_search_collectd(struct ndpi_detection_module_struct *ndpi_struct,
          */
         if (block_length != packet->payload_packet_len ||
             block_length < COLLECTD_ENCR_AES256_MIN_BLOCK_SIZE ||
-            ndpi_int_collectd_dissect_username(flow, packet, block_offset) != 0)
+            ndpi_int_collectd_dissect_username(flow, packet) != 0)
         {
-          NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+          NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
         } else {
           ndpi_int_collectd_add_connection(ndpi_struct, flow);
         }
@@ -180,30 +180,20 @@ void ndpi_search_collectd(struct ndpi_detection_module_struct *ndpi_struct,
 
   if (num_blocks < COLLECTD_MIN_BLOCKS_REQUIRED)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
-  if (hostname_length > 0 &&
-      ndpi_int_collectd_dissect_hostname(flow, packet, hostname_offset,
-                                         hostname_length) != 0)
-  {
-    ndpi_set_risk(ndpi_struct, flow, NDPI_MALFORMED_PACKET, "Invalid collectd Header");
-  }
+  if (hostname_length > 0)
+    ndpi_int_collectd_dissect_hostname(flow, packet, hostname_length);
 
   ndpi_int_collectd_add_connection(ndpi_struct, flow);
 }
 
-void init_collectd_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-                             u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_collectd_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("collectd", ndpi_struct, detection_bitmask, *id,
-    NDPI_PROTOCOL_COLLECTD,
-    ndpi_search_collectd,
-    NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-    SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-    ADD_TO_DETECTION_BITMASK
-  );
-
-  *id += 1;
+  register_dissector("collectd", ndpi_struct,
+                     ndpi_search_collectd,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_COLLECTD);
 }

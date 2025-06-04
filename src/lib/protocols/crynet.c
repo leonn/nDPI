@@ -1,7 +1,7 @@
 /*
  * crynet.c
  *
- * Copyright (C) 2022 - ntop.org
+ * Copyright (C) 2022-23 - ntop.org
  *
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -24,6 +24,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_CRYNET
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static void ndpi_int_crynet_add_connection(struct ndpi_detection_module_struct * const ndpi_struct,
                                            struct ndpi_flow_struct * const flow)
@@ -35,8 +36,8 @@ static void ndpi_int_crynet_add_connection(struct ndpi_detection_module_struct *
                              NDPI_CONFIDENCE_DPI);
 }
 
-void ndpi_search_crynet(struct ndpi_detection_module_struct *ndpi_struct,
-                        struct ndpi_flow_struct *flow)
+static void ndpi_search_crynet(struct ndpi_detection_module_struct *ndpi_struct,
+                               struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct const * const packet = &ndpi_struct->packet;
 
@@ -44,38 +45,32 @@ void ndpi_search_crynet(struct ndpi_detection_module_struct *ndpi_struct,
 
   if (packet->payload_packet_len < 26)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
   if (packet->payload_packet_len != packet->payload[0] + 10)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
-  if (ntohs(get_u_int16_t(packet->payload, 3)) != 0x08ed ||
+  if (packet->payload[0] != 0x3c ||
       packet->payload[16] != 0x01 ||
       packet->payload[20] != 0x07 ||
       ntohs(get_u_int16_t(packet->payload, 24)) != 0x0307)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
   ndpi_int_crynet_add_connection(ndpi_struct, flow);
 }
 
-void init_crynet_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-                           u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_crynet_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("CryNetwork", ndpi_struct, detection_bitmask, *id,
-    NDPI_PROTOCOL_CRYNET,
-    ndpi_search_crynet,
-    NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-    SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-    ADD_TO_DETECTION_BITMASK
-  );
-
-  *id += 1;
+  register_dissector("CryNetwork", ndpi_struct,
+                     ndpi_search_crynet,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_CRYNET);
 }

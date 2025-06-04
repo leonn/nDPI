@@ -28,12 +28,13 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_FTP_DATA
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static void ndpi_int_ftp_data_add_connection(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
   ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_FTP_DATA, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
-static int ndpi_match_ftp_data_port(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
+static int ndpi_match_ftp_data_port(struct ndpi_detection_module_struct *ndpi_struct) {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   /* Check connection over TCP */
@@ -45,7 +46,7 @@ static int ndpi_match_ftp_data_port(struct ndpi_detection_module_struct *ndpi_st
   return 0;
 }
 
-static int ndpi_match_ftp_data_directory(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
+static int ndpi_match_ftp_data_directory(struct ndpi_detection_module_struct *ndpi_struct) {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int32_t payload_len = packet->payload_packet_len;
 
@@ -69,7 +70,7 @@ static int ndpi_match_ftp_data_directory(struct ndpi_detection_module_struct *nd
   return 0;
 }
 
-static int ndpi_match_file_header(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
+static int ndpi_match_file_header(struct ndpi_detection_module_struct *ndpi_struct) {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int32_t payload_len = packet->payload_packet_len;
 
@@ -79,10 +80,6 @@ static int ndpi_match_file_header(struct ndpi_detection_module_struct *ndpi_stru
 
   /* RIFF is a meta-format for storing AVI and WAV files */
   if(ndpi_match_strprefix(packet->payload, payload_len, "RIFF"))
-    return 1;
-
-  /* MZ is a .exe file */
-  if((packet->payload[0] == 'M') && (packet->payload[1] == 'Z') && (packet->payload[3] == 0x00))
     return 1;
 
   /* Ogg files */
@@ -115,10 +112,6 @@ static int ndpi_match_file_header(struct ndpi_detection_module_struct *ndpi_stru
 
   /* PHP scripts */
   if((packet->payload[0] == 0x3c) && (packet->payload[1] == 0x3f) && (packet->payload[2] == 0x70) && (packet->payload[3] == 0x68))
-    return 1;
-
-  /* Unix scripts */
-  if((packet->payload[0] == 0x23) && (packet->payload[1] == 0x21) && (packet->payload[2] == 0x2f) && (packet->payload[3] == 0x62))
     return 1;
 
   /* PDFs */
@@ -234,9 +227,9 @@ static void ndpi_check_ftp_data(struct ndpi_detection_module_struct *ndpi_struct
   */
   if(ndpi_seen_flow_beginning(flow)) {
     if((packet->payload_packet_len > 0)
-       && (ndpi_match_file_header(ndpi_struct, flow)
-	   || ndpi_match_ftp_data_directory(ndpi_struct, flow) 
-	   || ndpi_match_ftp_data_port(ndpi_struct, flow)
+       && (ndpi_match_file_header(ndpi_struct)
+	   || ndpi_match_ftp_data_directory(ndpi_struct) 
+	   || ndpi_match_ftp_data_port(ndpi_struct)
 	   )
        ) {
       NDPI_LOG_INFO(ndpi_struct, "found FTP_DATA request\n");
@@ -245,30 +238,20 @@ static void ndpi_check_ftp_data(struct ndpi_detection_module_struct *ndpi_struct
     }
   }
   
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
-void ndpi_search_ftp_data(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
+static void ndpi_search_ftp_data(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
 	
-  /* Break after 20 packets. */
-  if(flow->packet_counter > 20) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
-    return;
-  }
-
   NDPI_LOG_DBG(ndpi_struct, "search FTP_DATA\n");
   ndpi_check_ftp_data(ndpi_struct, flow);
 }
 
 
-void init_ftp_data_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_ftp_data_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("FTP_DATA", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_FTP_DATA,
-				      ndpi_search_ftp_data,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("FTP_DATA", ndpi_struct,
+                     ndpi_search_ftp_data,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_FTP_DATA);
 }

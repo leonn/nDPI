@@ -25,6 +25,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_AJP
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 enum ajp_direction {
   AJP_SERVER_TO_CONTAINER = 0x1234,
@@ -34,7 +35,7 @@ enum ajp_direction {
 enum ajp_packet_type {
   AJP_UNKNOWN = 0,
 
-   /* packet types */
+  /* packet types */
   AJP_FORWARD_REQUEST = 2,
   AJP_SEND_BODY_CHUNK = 3,
   AJP_SEND_HEADERS = 4,
@@ -55,10 +56,10 @@ struct ajp_header {
 } PACK_OFF;
 
 static void set_ajp_detected(struct ndpi_detection_module_struct *ndpi_struct,
-           struct ndpi_flow_struct *flow) {
+			     struct ndpi_flow_struct *flow) {
 
   if(flow->detected_protocol_stack[0] == NDPI_PROTOCOL_UNKNOWN) {
-      ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_AJP, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+    ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_AJP, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
   }
 }
 
@@ -71,7 +72,7 @@ static void ndpi_check_ajp(struct ndpi_detection_module_struct *ndpi_struct,
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   if (packet->payload_packet_len < sizeof(ajp_hdr)) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -88,7 +89,7 @@ static void ndpi_check_ajp(struct ndpi_detection_module_struct *ndpi_struct,
 
     } else {
       NDPI_LOG_DBG(ndpi_struct, "Invalid AJP request type");
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     }
   } else if (ajp_hdr.len > 0 && ajp_hdr.magic == AJP_CONTAINER_TO_SERVER) {
     if (ajp_hdr.code == AJP_SEND_BODY_CHUNK || ajp_hdr.code == AJP_SEND_HEADERS
@@ -99,27 +100,17 @@ static void ndpi_check_ajp(struct ndpi_detection_module_struct *ndpi_struct,
 
     } else {
       NDPI_LOG_DBG(ndpi_struct, "Invalid AJP response type");
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     }
   } else {
     NDPI_LOG_DBG(ndpi_struct,"Invalid AJP packet\n");
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
   }
 }
 
-void ndpi_search_ajp(struct ndpi_detection_module_struct *ndpi_struct,
- struct ndpi_flow_struct *flow)
+static void ndpi_search_ajp(struct ndpi_detection_module_struct *ndpi_struct,
+                            struct ndpi_flow_struct *flow)
 {
-  // Break after 20 packets.
-  if(flow->packet_counter > 20) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
-    return;
-  }
-
-  if(flow->detected_protocol_stack[0] != NDPI_PROTOCOL_UNKNOWN) {
-    return;
-  }
-
   NDPI_LOG_DBG(ndpi_struct, "search AJP\n");
   ndpi_check_ajp(ndpi_struct, flow);
 
@@ -129,14 +120,10 @@ void ndpi_search_ajp(struct ndpi_detection_module_struct *ndpi_struct,
 /* ********************************* */
 
 
-void init_ajp_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-  u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_ajp_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("AJP", ndpi_struct, detection_bitmask,
-    *id, NDPI_PROTOCOL_AJP, ndpi_search_ajp,
-    NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-    SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-    ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("AJP", ndpi_struct,
+                     ndpi_search_ajp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_AJP);
 }

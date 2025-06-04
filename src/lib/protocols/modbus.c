@@ -26,9 +26,10 @@
 #include "ndpi_protocol_ids.h"
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_MODBUS
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
-void ndpi_search_modbus_tcp(struct ndpi_detection_module_struct *ndpi_struct,
-                            struct ndpi_flow_struct *flow) {
+static void ndpi_search_modbus_tcp(struct ndpi_detection_module_struct *ndpi_struct,
+                                   struct ndpi_flow_struct *flow) {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   NDPI_LOG_DBG(ndpi_struct, "search Modbus\n");
   u_int16_t modbus_port = htons(502); // port used by modbus
@@ -45,27 +46,31 @@ void ndpi_search_modbus_tcp(struct ndpi_detection_module_struct *ndpi_struct,
       u_int16_t modbus_len = htons(*((u_int16_t*)&packet->payload[4]));
 
       // the fourth parameter of the payload is the length of the segment            
-      if((modbus_len-1) == (packet->payload_packet_len - 7 /* ModbusTCP header len */)) {
-	NDPI_LOG_INFO(ndpi_struct, "found MODBUS\n");
-	ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_MODBUS, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
-	return;
+      if(((modbus_len-1) == (packet->payload_packet_len - 7 /* ModbusTCP header len */))
+	 && (packet->payload[2] == 0x0) && (packet->payload[3] == 0x0) /* Protocol identifier */) {
+	/* Check Modbus function code. 0x5A (90) is reserved for UMAS protocol */
+        if (packet->payload[7] == 0x5A) {
+          NDPI_LOG_INFO(ndpi_struct, "found Schneider Electric UMAS\n");
+          ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_UMAS, NDPI_PROTOCOL_MODBUS, NDPI_CONFIDENCE_DPI);
+          return;
+        }
+
+        NDPI_LOG_INFO(ndpi_struct, "found MODBUS\n");
+        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_MODBUS, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+        return;
       }
     }
   }
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
    
 }
 
 
 
-void init_modbus_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-                           u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask) {
-	
-  ndpi_set_bitmask_protocol_detection("Modbus", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_MODBUS,
-				      ndpi_search_modbus_tcp,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-  *id += 1;
+void init_modbus_dissector(struct ndpi_detection_module_struct *ndpi_struct) {
+
+  register_dissector("Modbus", ndpi_struct,
+                     ndpi_search_modbus_tcp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                      1, NDPI_PROTOCOL_MODBUS);
 }

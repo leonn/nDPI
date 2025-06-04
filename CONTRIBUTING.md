@@ -5,7 +5,7 @@ Please keep all code, comments, issues and pull requests in English, otherwise t
 ## Found a bug?
 
 - First, check there are no already open issues for the bug. See [here](https://github.com/ntop/nDPI/issues).
-- If there is not open issue addressing the bug, [open a new one](https://github.com/ntop/nDPI/issues/new).
+- If there is no open issue addressing the bug, [open a new one](https://github.com/ntop/nDPI/issues/new).
 - Make sure to include a **descriptive and clear title and description**, including the **version of nDPI** being used.
 - Try to include steps to reproduce the bug.
 - If applicable, try to provide a stacktrace.
@@ -23,5 +23,11 @@ Please keep all code, comments, issues and pull requests in English, otherwise t
 - Open a new pull request with a **clear, descriptive** title.
 - If there is an open issue for the bug, ensure the description of the pull request contains `Fixes #issue_number`.
 - Ensure the pull request passes CI testing. Any pull request which fails CI will be **ignored**.
+
+## Before you submit your code
+
+As we want to make sure that we can incorporate your changes in nDPI, we ask all contributors to read and sign the
+[Contributor License Agreement](https://github.com/ntop/legal/blob/main/individual-contributor-licence-agreement.md)
+that guarantees that your code is original and royalty-free to keep nDPI free and available for everybody,
 
 Finally, thank you for your contributions.

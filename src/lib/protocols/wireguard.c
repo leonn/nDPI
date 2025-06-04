@@ -27,6 +27,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_WIREGUARD
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 /*
  * See https://www.wireguard.com/protocol/ for protocol reference.
@@ -39,8 +40,23 @@ enum wg_message_type {
   WG_TYPE_TRANSPORT_DATA = 4
 };
 
-void ndpi_search_wireguard(struct ndpi_detection_module_struct
-			   *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_int_wireguard_add_connection(struct ndpi_detection_module_struct * const ndpi_struct,
+                                              struct ndpi_flow_struct * const flow,
+                                              u_int16_t app_protocol)
+{
+  if(ndpi_struct->cfg.wireguard_subclassification_by_ip &&
+     ndpi_struct->proto_defaults[flow->guessed_protocol_id_by_ip].protoCategory == NDPI_PROTOCOL_CATEGORY_VPN) {
+    ndpi_set_detected_protocol(ndpi_struct, flow, flow->guessed_protocol_id_by_ip, NDPI_PROTOCOL_WIREGUARD, NDPI_CONFIDENCE_DPI);
+  } else if(app_protocol != NDPI_PROTOCOL_UNKNOWN) {
+    ndpi_set_detected_protocol(ndpi_struct, flow, app_protocol, NDPI_PROTOCOL_WIREGUARD, NDPI_CONFIDENCE_DPI);
+  } else {
+    ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_WIREGUARD, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+  }
+}
+
+
+static void ndpi_search_wireguard(struct ndpi_detection_module_struct *ndpi_struct,
+				  struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   const u_int8_t *payload = packet->payload;
@@ -66,14 +82,14 @@ void ndpi_search_wireguard(struct ndpi_detection_module_struct
    * Note that handshake packets have a slightly different structure, but they are larger.
    */
   if (packet->payload_packet_len < 32) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
   /*
    * The next three bytes after the message type are reserved and set to zero.
    */
   if (payload[1] != 0 || payload[2] != 0 || payload[3] != 0) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -90,16 +106,30 @@ void ndpi_search_wireguard(struct ndpi_detection_module_struct
    * 2) Handshake Response (92 bytes)
    * 3) Cookie Reply (64 bytes)
    * 4) Transport Data (variable length, min 32 bytes)
+   *
+   *
+   * TunnelBear VPN uses slightly different handshake packets: the format seems the same,
+   * but the length is different (204/100). Not sure why and I don't know if it is some
+   * kind of generic "obfuscation" attempt, used also by other apps. For the time being,
+   * classify this kind of traffic as Wireguard/TunnelBear
    */
-  if (message_type == WG_TYPE_HANDSHAKE_INITIATION && packet->payload_packet_len == 148) {
+  if (message_type == WG_TYPE_HANDSHAKE_INITIATION &&
+      (packet->payload_packet_len == 148 || packet->payload_packet_len == 204)) {
     u_int32_t sender_index = get_u_int32_t(payload, 4);
     /*
      * We always start a new detection stage on a handshake initiation.
      */
     flow->l4.udp.wireguard_stage = 1 + packet->packet_direction;
     flow->l4.udp.wireguard_peer_index[packet->packet_direction] = sender_index;
+
+    if(flow->num_processed_pkts > 1) {
+      /* This looks like a retransmission and probably this communication is blocked hence let's stop here */
+      ndpi_int_wireguard_add_connection(ndpi_struct, flow, NDPI_PROTOCOL_UNKNOWN);
+      return;
+    } 
     /* need more packets before deciding */
-  } else if (message_type == WG_TYPE_HANDSHAKE_RESPONSE && packet->payload_packet_len == 92) {
+  } else if (message_type == WG_TYPE_HANDSHAKE_RESPONSE &&
+             (packet->payload_packet_len == 92 || packet->payload_packet_len == 100)) {
     if (flow->l4.udp.wireguard_stage == 2 - packet->packet_direction) {
       /*
        * This means we are probably processing a handshake response to a handshake
@@ -107,10 +137,15 @@ void ndpi_search_wireguard(struct ndpi_detection_module_struct
        * matches the index in the handshake initiation.
        */
       u_int32_t receiver_index = get_u_int32_t(payload, 8);
+
       if (receiver_index == flow->l4.udp.wireguard_peer_index[1 - packet->packet_direction]) {
-        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_WIREGUARD, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+        if(packet->payload_packet_len == 100 &&
+           ndpi_struct->cfg.wireguard_subclassification_by_ip /* TODO: the right option? */)
+          ndpi_int_wireguard_add_connection(ndpi_struct, flow, NDPI_PROTOCOL_TUNNELBEAR);
+        else
+          ndpi_int_wireguard_add_connection(ndpi_struct, flow, NDPI_PROTOCOL_UNKNOWN);
       } else {
-        NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+        NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       }
     }
     /* need more packets before deciding */
@@ -124,9 +159,9 @@ void ndpi_search_wireguard(struct ndpi_detection_module_struct
     if (flow->l4.udp.wireguard_stage == 2 - packet->packet_direction) {
       u_int32_t receiver_index = get_u_int32_t(payload, 4);
       if (receiver_index == flow->l4.udp.wireguard_peer_index[1 - packet->packet_direction]) {
-        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_WIREGUARD, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+        ndpi_int_wireguard_add_connection(ndpi_struct, flow, NDPI_PROTOCOL_UNKNOWN);
       } else {
-        NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+        NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       }
     }
     /* need more packets before deciding */
@@ -140,7 +175,7 @@ void ndpi_search_wireguard(struct ndpi_detection_module_struct
     u_int32_t receiver_index = get_u_int32_t(payload, 4);
 
     /* We speculate this is wireguard, so let's remember it */
-    flow->guessed_protocol_id = NDPI_PROTOCOL_WIREGUARD;
+    flow->fast_callback_protocol_id = NDPI_PROTOCOL_WIREGUARD;
     
     if (flow->l4.udp.wireguard_stage == 0) {
       flow->l4.udp.wireguard_stage = 3 + packet->packet_direction;
@@ -152,25 +187,21 @@ void ndpi_search_wireguard(struct ndpi_detection_module_struct
       /* need more packets before deciding */
     } else if (flow->l4.udp.wireguard_stage == 5) {
       if (receiver_index == flow->l4.udp.wireguard_peer_index[packet->packet_direction]) {
-        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_WIREGUARD, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+        ndpi_int_wireguard_add_connection(ndpi_struct, flow, NDPI_PROTOCOL_UNKNOWN);
       } else {
-        NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+        NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       }
     }
     /* need more packets before deciding */
   } else {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
   }
 }
 
-void init_wireguard_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_wireguard_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("WireGuard", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_WIREGUARD,
-				      ndpi_search_wireguard,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("WireGuard", ndpi_struct,
+                     ndpi_search_wireguard,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_WIREGUARD);
 }

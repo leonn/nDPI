@@ -1,7 +1,7 @@
 /*
  * fastcgi.c
  *
- * Copyright (C) 2022 - ntop.org
+ * Copyright (C) 2022-23 - ntop.org
  *
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -24,6 +24,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_FASTCGI
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 /* Reference: http://www.mit.edu/~yandros/doc/specs/fcgi-spec.html */
 
@@ -95,7 +96,6 @@ static int fcgi_parse_params(struct ndpi_flow_struct * const flow,
     { "HTTP_HOST", &packet->host_line },
     { "HTTP_ACCEPT", &packet->accept_line },
     { "HTTP_USER_AGENT", &packet->user_agent_line },
-    { "HTTP_ACCEPT_ENCODING", &packet->http_transfer_encoding },
     { "SERVER_SOFTWARE", &packet->server_line },
     { "REQUEST_METHOD", &packet->http_method }
   };
@@ -136,26 +136,19 @@ static int fcgi_parse_params(struct ndpi_flow_struct * const flow,
     return 1;
   }
 
-  flow->http.method = ndpi_http_str2method((const char*)packet->http_method.ptr,
-                                           (u_int16_t)packet->http_method.len);
-  ndpi_hostname_sni_set(flow, packet->host_line.ptr, packet->host_line.len);
-  ndpi_user_agent_set(flow, packet->user_agent_line.ptr, packet->user_agent_line.len);
-
-  if (flow->http.url == NULL && packet->http_url_name.len > 0)
-  {
-    flow->http.url = ndpi_malloc(packet->http_url_name.len + 1);
-    if (flow->http.url != NULL)
-    {
-      strncpy(flow->http.url, (char const *)packet->http_url_name.ptr, packet->http_url_name.len);
-      flow->http.url[packet->http_url_name.len] = '\0';
-    }
-  }
+  flow->protos.fast_cgi.method = ndpi_http_str2method((const char*)packet->http_method.ptr,
+                                                      (u_int16_t)packet->http_method.len);
+  ndpi_hostname_sni_set(flow, packet->host_line.ptr, packet->host_line.len, NDPI_HOSTNAME_NORM_ALL);
+  strncpy(flow->protos.fast_cgi.user_agent, (char *)packet->user_agent_line.ptr,
+          ndpi_min(sizeof(flow->protos.fast_cgi.user_agent) - 1, packet->user_agent_line.len));
+  strncpy(flow->protos.fast_cgi.url, (char *)packet->http_url_name.ptr,
+          ndpi_min(sizeof(flow->protos.fast_cgi.url) - 1, packet->http_url_name.len));
 
   return 0;
 }
 
-void ndpi_search_fastcgi(struct ndpi_detection_module_struct *ndpi_struct,
-                         struct ndpi_flow_struct *flow)
+static void ndpi_search_fastcgi(struct ndpi_detection_module_struct *ndpi_struct,
+                                struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct * const packet = &ndpi_struct->packet;
   struct FCGI_Header const * fcgi_hdr;
@@ -167,7 +160,7 @@ void ndpi_search_fastcgi(struct ndpi_detection_module_struct *ndpi_struct,
 
   if (packet->payload_packet_len < sizeof(struct FCGI_Header))
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -175,21 +168,21 @@ void ndpi_search_fastcgi(struct ndpi_detection_module_struct *ndpi_struct,
 
   if (fcgi_hdr->version != 0x01)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
   fcgi_type = (enum FCGI_Type)fcgi_hdr->type;
   if (fcgi_type < FCGI_MIN || fcgi_type > FCGI_MAX)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
   content_len = ntohs(fcgi_hdr->contentLength);
   if (packet->payload_packet_len != sizeof(*fcgi_hdr) + content_len + fcgi_hdr->paddingLength)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -210,18 +203,18 @@ void ndpi_search_fastcgi(struct ndpi_detection_module_struct *ndpi_struct,
       ndpi_match_host_subprotocol(ndpi_struct, flow,
                                   flow->host_server_name,
                                   strlen(flow->host_server_name),
-                                  &ret_match, NDPI_PROTOCOL_FASTCGI);
+                                  &ret_match, NDPI_PROTOCOL_FASTCGI, 1);
       ndpi_check_dga_name(ndpi_struct, flow,
-                          flow->host_server_name, 1, 0);
-      if(ndpi_is_valid_hostname(flow->host_server_name,
-                                strlen(flow->host_server_name)) == 0) {
+                          flow->host_server_name, 1, 0, 0);
+      if(ndpi_is_valid_hostname((char *)packet->host_line.ptr,
+                                packet->host_line.len) == 0) {
         char str[128];
 
         snprintf(str, sizeof(str), "Invalid host %s", flow->host_server_name);
         ndpi_set_risk(ndpi_struct, flow, NDPI_INVALID_CHARACTERS, str);
 
         /* This looks like an attack */
-        ndpi_set_risk(ndpi_struct, flow, NDPI_POSSIBLE_EXPLOIT, NULL);
+        ndpi_set_risk(ndpi_struct, flow, NDPI_POSSIBLE_EXPLOIT, "Suspicious hostname: attack ?");
       }
       ndpi_int_fastcgi_add_connection(ndpi_struct, flow, &ret_match);
     }
@@ -242,16 +235,10 @@ static int ndpi_search_fastcgi_extra(struct ndpi_detection_module_struct * ndpi_
   return flow->extra_packets_func != NULL;
 }
 
-void init_fastcgi_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-                            u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_fastcgi_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("FastCGI", ndpi_struct, detection_bitmask, *id,
-    NDPI_PROTOCOL_FASTCGI,
-    ndpi_search_fastcgi,
-    NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-    SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-    ADD_TO_DETECTION_BITMASK
-  );
-
-  *id += 1;
+  register_dissector("FastCGI", ndpi_struct,
+                     ndpi_search_fastcgi,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_FASTCGI);
 }

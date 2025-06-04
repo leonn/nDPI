@@ -1,7 +1,7 @@
 /*
  * alicloud.c
  *
- * Copyright (C) 2022 - ntop.org
+ * Copyright (C) 2022-23 - ntop.org
  *
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -24,6 +24,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_ALICLOUD
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static void ndpi_int_alicloud_add_connection(struct ndpi_detection_module_struct * const ndpi_struct,
                                              struct ndpi_flow_struct * const flow)
@@ -34,8 +35,8 @@ static void ndpi_int_alicloud_add_connection(struct ndpi_detection_module_struct
                              NDPI_CONFIDENCE_DPI);
 }
 
-void ndpi_search_alicloud(struct ndpi_detection_module_struct *ndpi_struct,
-                          struct ndpi_flow_struct *flow)
+static void ndpi_search_alicloud(struct ndpi_detection_module_struct *ndpi_struct,
+                                 struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct const * const packet = &ndpi_struct->packet;
 
@@ -43,7 +44,7 @@ void ndpi_search_alicloud(struct ndpi_detection_module_struct *ndpi_struct,
 
   if (packet->payload_packet_len < 8)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -63,20 +64,14 @@ void ndpi_search_alicloud(struct ndpi_detection_module_struct *ndpi_struct,
 
   if (flow->packet_counter > 3)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
   }
 }
 
-void init_alicloud_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-                             u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_alicloud_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("AliCloud", ndpi_struct, detection_bitmask, *id,
-    NDPI_PROTOCOL_ALICLOUD,
-    ndpi_search_alicloud,
-    NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-    SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-    ADD_TO_DETECTION_BITMASK
-  );
-
-  *id += 1;
+  register_dissector("AliCloud", ndpi_struct,
+                     ndpi_search_alicloud,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_ALICLOUD);
 }

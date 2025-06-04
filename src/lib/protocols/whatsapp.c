@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2018 - ntop.org
  *
- * nDPI is free software: you can zmqtribute it and/or modify
+ * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
@@ -22,6 +22,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_WHATSAPP
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 #define WA_SEQ(seq) { .sequence_size = NDPI_ARRAY_LENGTH(seq) - 1 /* '\0' */, \
                       .sequence = seq }
@@ -84,15 +85,15 @@ static int ndpi_int_match_whatsapp_sequence(struct ndpi_detection_module_struct 
   return 1;
 }
 
-void ndpi_search_whatsapp(struct ndpi_detection_module_struct *ndpi_struct,
-			  struct ndpi_flow_struct *flow) {
+static void ndpi_search_whatsapp(struct ndpi_detection_module_struct *ndpi_struct,
+				 struct ndpi_flow_struct *flow) {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   NDPI_LOG_DBG(ndpi_struct, "search WhatsApp\n");
 
   if (flow->packet_counter > 3)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -115,21 +116,14 @@ void ndpi_search_whatsapp(struct ndpi_detection_module_struct *ndpi_struct,
     return;
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 
-void init_whatsapp_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-                             u_int32_t *id,
-                             NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_whatsapp_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection(
-    "WhatsApp", ndpi_struct, detection_bitmask, *id,
-    NDPI_PROTOCOL_WHATSAPP,
-    ndpi_search_whatsapp,
-    NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-	SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-	ADD_TO_DETECTION_BITMASK
-  );
-  *id += 1;
+  register_dissector("WhatsApp", ndpi_struct,
+                     ndpi_search_whatsapp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_WHATSAPP);
 }

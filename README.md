@@ -1,14 +1,13 @@
-![ntop][ntopng_logo] ![ntop][ntop_logo]
 # nDPI
 
-[![Build Status](https://img.shields.io/github/workflow/status/ntop/nDPI/Build/dev?logo=github)](https://github.com/ntop/nDPI/actions?query=workflow%3ABuild)
-[![Code Quality: Cpp](https://img.shields.io/lgtm/grade/cpp/g/ntop/nDPI.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/ntop/nDPI/context:cpp)
-[![Total Alerts](https://img.shields.io/lgtm/alerts/g/ntop/nDPI.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/ntop/nDPI/alerts)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/ntop/nDPI/build.yml?branch=dev&logo=github)](https://github.com/ntop/nDPI/actions?query=workflow%3ABuild)
 [![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/ndpi.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:ndpi)
 
 ## What is nDPI ?
 
-nDPI® is an open source LGPLv3 library for deep-packet inspection. Based on OpenDPI it includes ntop extensions. We have tried to push them into the OpenDPI source tree but nobody answered emails so we have decided to create our own source tree
+nDPI® is an open source LGPLv3 library for deep-packet inspection.
+
+A generic FAQ about nDPI® is available [here](https://github.com/ntop/nDPI/blob/dev/doc/FAQ.md)
 
 ### How To Compile nDPI
 
@@ -53,7 +52,7 @@ On Windows:
 There are three supported ways to build nDPI:
 
 1. MSYS2 (assuming [MSYS2](https://www.msys2.org/) already installed):
-  - msys2 -c "pacman --noconfirm -S --needed --overwrite '\*' git mingw-w64-x86\_64-toolchain automake1.16 automake-wrapper autoconf libtool make mingw-w64-x86\_64-json-c mingw-w64-x86\_64-crt-git mingw-w64-x86\_64-pcre mingw-w64-x86\_64-libpcap"
+  - msys2 -c "pacman --noconfirm -S --needed --overwrite '\*' git mingw-w64-x86\_64-toolchain automake1.16 automake-wrapper autoconf libtool make mingw-w64-x86\_64-json-c mingw-w64-x86\_64-crt-git mingw-w64-x86\_64-pcre2 mingw-w64-x86\_64-libpcap"
 
 2. Mingw-w64
 
@@ -77,12 +76,15 @@ The entire procedure of adding new protocols in detail:
 1. Add new protocol together with its unique ID to: `src/include/ndpi_protocol_ids.h`
 2. Create a new protocol in: `src/lib/protocols/`
 3. Variables to be kept for the duration of the entire flow (as state variables) need to be placed in: `src/include/ndpi_typedefs.h` in `ndpi_flow_tcp_struct` (for TCP only), `ndpi_flow_udp_struct` (for UDP only), or `ndpi_flow_struct` (for both).
-4. Add a new entry for the search function for the new protocol in: `src/include/ndpi_protocols.h`
+4. Add a new entry for the search function for the new protocol in: `src/include/ndpi_private.h`
 5. Choose (do not change anything) a selection bitmask from: `src/include/ndpi_define.h`
 6. Set protocol default ports in `ndpi_init_protocol_defaults` in: `src/lib/ndpi_main.c`
-7. `./autogen.sh`
-8. `make`
-9. `make check`
+7. Be sure to have nBPF support, cloning `PF_RING` in the same directory where you cloned `nDPI`: `git clone https://github.com/ntop/PF_RING/ && cd PF_RING/userland/nbpf && ./configure && make`. You can ignore the `/bin/sh: 1: ../lib/pfring_config: not found` error
+8. From the `nDPI` root directory, `./autogen.sh --with-pcre2` (nBPF and PCRE2 are usually optional, but they are needed to run/update *all* the unit tests)
+9. `make`
+10. `make check`
+11. Update the documentation, adding this new protocol to `doc/protocols.rst`
+12. Update the Windows Visual Studio configuration, adding the new c file in `windows/nDPI.vcxproj`
 
 ### How to use nDPI to Block Selected Traffic
 
@@ -94,8 +96,12 @@ You can use nDPI to selectively block selected Internet traffic by embedding it 
 
 ### Videos and Presentations
 
-- [Using nDPI for Monitoring and Security](https://archive.fosdem.org/2021/schedule/event/nemondpi/)
-- [Network Traffic Classification for Cybersecurity and Monitoring](https://fosdem.org/2022/schedule/event/using_ndpi_to_efficiently_classify_network_traffic/)
+- [Knowing the Unknown: How to Monitor and Troubleshoot an Unfamiliar Network](https://www.ntop.org/wp-content/uploads/2017/06/nDPI_Sharkfest_2017.pdf) [SharkFest, 2017]
+- [Using nDPI for Monitoring and Security](https://archive.fosdem.org/2021/schedule/event/nemondpi/) [FOSDEM, 2021]
+- [Network Traffic Classification for Cybersecurity and Monitoring](https://fosdem.org/2022/schedule/event/using_ndpi_to_efficiently_classify_network_traffic/) [FOSDEM, 2022]
+- [A Deep Dive Into Traffic Fingerprints using Wireshark](https://www.dropbox.com/scl/fo/zm5amy8fkwz2pj3ojz12a/AMKbeuIToNPH9wCAqB1OWdQ?rlkey=ihnva3yz5heonw59m8br3lxvj&e=2&dl=0) [SharkFest, 2024]
+- [Passive Network Traffic Fingerprinting](https://fosdem.org/2025/schedule/event/fosdem-2025-5461-passive-network-traffic-fingerprinting/) [FOSDEM, 2025]
+- [Using nDPI to solve real life problems: from First Packet Classification to Obfuscated Traffic detection](https://packetfest.ntop.org/slides/Nardi.pdf) [PacketFest, 2025]
 
 ### nDPI-Related Projects
 

@@ -1,7 +1,7 @@
 /*
  * qq.c
  *
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -28,9 +28,10 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_CPHA
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 
-void ndpi_search_cpha(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
+static void ndpi_search_cpha(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   const u_int16_t cpha_port = htons(8116);
   
@@ -47,18 +48,13 @@ void ndpi_search_cpha(struct ndpi_detection_module_struct *ndpi_struct, struct n
      ) {
     ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_CPHA, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
   } else
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);      
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);      
 }
 
 
-void init_cpha_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id,
-			 NDPI_PROTOCOL_BITMASK *detection_bitmask) {
-  ndpi_set_bitmask_protocol_detection("CPHA", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_CPHA,
-				      ndpi_search_cpha,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_UDP_WITH_PAYLOAD, /* TODO: ipv6 support? */
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+void init_cpha_dissector(struct ndpi_detection_module_struct *ndpi_struct) {
+  register_dissector("CPHA", ndpi_struct,
+                     ndpi_search_cpha,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_UDP_WITH_PAYLOAD, /* TODO: ipv6 support? */
+                     1, NDPI_PROTOCOL_CPHA);
 }

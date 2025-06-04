@@ -63,7 +63,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)src\;$(ProjectDir)..\src\lib\protocols\;$(ProjectDir)..\src\include\;$(ProjectDir)..\;$(ProjectDir)..\src\lib\third_party\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src\;$(ProjectDir)src\lib\;$(ProjectDir)..\src\lib\;$(ProjectDir)..\src\include\;$(ProjectDir)..\;$(ProjectDir)..\src\lib\third_party\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NDPI_LIB_COMPILATION;WIN32;_WIN64;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -82,6 +82,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <AdditionalDependencies>Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Ws2_32.lib;$(ProjectDir)..\windows\packages\pthreads.2.9.1.4\build\native\lib\v110\x64\Debug\static\cdecl\libpthread-static.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <FullProgramDatabaseFile>true</FullProgramDatabaseFile>
       <AssemblyDebug>true</AssemblyDebug>
     </Link>
@@ -91,7 +92,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-ndpiReader|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)src\;$(ProjectDir)..\src\lib\protocols\;$(ProjectDir)..\src\include\;$(ProjectDir)..\;$(ProjectDir)..\src\lib\third_party\include\;$(ProjectDir)..\windows\WpdPack\Include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src\;$(ProjectDir)src\lib\;$(ProjectDir)..\src\lib\;$(ProjectDir)..\src\include\;$(ProjectDir)..\;$(ProjectDir)..\src\lib\third_party\include\;$(ProjectDir)..\windows\WpdPack\Include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;STATIC_GETOPT;NDPI_LIB_COMPILATION;HAVE_STRUCT_TIMESPEC;WIN32;_WIN64;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -128,8 +129,17 @@
     <ClCompile Include="..\src\lib\ndpi_community_id.c" />
     <ClCompile Include="..\src\lib\ndpi_geoip.c" />
     <ClCompile Include="..\src\lib\ndpi_main.c" />
+    <ClCompile Include="..\src\lib\ndpi_cache.c" />
+    <ClCompile Include="..\src\lib\ndpi_filter.c" />
+    <ClCompile Include="..\src\lib\ndpi_memory.c" />
     <ClCompile Include="..\src\lib\ndpi_serializer.c" />
     <ClCompile Include="..\src\lib\ndpi_utils.c" />
+    <ClCompile Include="..\src\lib\ndpi_fingerprint.c" />
+    <ClCompile Include="..\src\lib\ndpi_domains.c" />
+    <ClCompile Include="..\src\lib\ndpi_binary_bitmap.c" />
+    <ClCompile Include="..\src\lib\ndpi_hash.c" />
+    <ClCompile Include="..\src\lib\ndpi_domain_classify.c" />
+    <ClCompile Include="..\src\lib\ndpi_bitmap64_fuse.c" />
     <ClCompile Include="..\src\lib\protocols\activision.c" />
     <ClCompile Include="..\src\lib\protocols\afp.c" />
     <ClCompile Include="..\src\lib\protocols\ajp.c" />
@@ -140,22 +150,28 @@
     <ClCompile Include="..\src\lib\protocols\apple_push.c" />
     <ClCompile Include="..\src\lib\protocols\avast.c" />
     <ClCompile Include="..\src\lib\protocols\avast_securedns.c" />
+    <ClCompile Include="..\src\lib\protocols\bacnet.c" />
+    <ClCompile Include="..\src\lib\protocols\bitcoin.c" />
     <ClCompile Include="..\src\lib\protocols\bjnp.c" />
+    <ClCompile Include="..\src\lib\protocols\can.c" />
     <ClCompile Include="..\src\lib\protocols\capwap.c" />
     <ClCompile Include="..\src\lib\protocols\cassandra.c" />
     <ClCompile Include="..\src\lib\protocols\checkmk.c" />
     <ClCompile Include="..\src\lib\protocols\collectd.c" />
     <ClCompile Include="..\src\lib\protocols\cpha.c" />
     <ClCompile Include="..\src\lib\protocols\crynet.c" />
-    <ClCompile Include="..\src\lib\protocols\csgo.c" />
     <ClCompile Include="..\src\lib\protocols\diameter.c" />
     <ClCompile Include="..\src\lib\protocols\discord.c" />
     <ClCompile Include="..\src\lib\protocols\dnp3.c" />
     <ClCompile Include="..\src\lib\protocols\dnscrypt.c" />
+    <ClCompile Include="..\src\lib\protocols\elastic_search.c" />
+    <ClCompile Include="..\src\lib\protocols\ethereum.c" />
     <ClCompile Include="..\src\lib\protocols\ethernet_ip.c" />
+    <ClCompile Include="..\src\lib\protocols\epicgames.c" />
     <ClCompile Include="..\src\lib\protocols\fastcgi.c" />
     <ClCompile Include="..\src\lib\protocols\fix.c" />
     <ClCompile Include="..\src\lib\protocols\genshin_impact.c" />
+    <ClCompile Include="..\src\lib\protocols\haproxy.c" />
     <ClCompile Include="..\src\lib\protocols\hpvirtgrp.c" />
     <ClCompile Include="..\src\lib\protocols\hsrp.c" />
     <ClCompile Include="..\src\lib\protocols\i3d.c" />
@@ -163,9 +179,12 @@
     <ClCompile Include="..\src\lib\protocols\imo.c" />
     <ClCompile Include="..\src\lib\protocols\ipsec.c" />
     <ClCompile Include="..\src\lib\protocols\kismet.c" />
+    <ClCompile Include="..\src\lib\protocols\line.c" />
     <ClCompile Include="..\src\lib\protocols\lisp.c" />
     <ClCompile Include="..\src\lib\protocols\memcached.c" />
+    <ClCompile Include="..\src\lib\protocols\merakicloud.c" />
     <ClCompile Include="..\src\lib\protocols\mining.c" />
+    <ClCompile Include="..\src\lib\protocols\mikrotik.c" />
     <ClCompile Include="..\src\lib\protocols\modbus.c" />
     <ClCompile Include="..\src\lib\protocols\mongodb.c" />
     <ClCompile Include="..\src\lib\protocols\mpegdash.c" />
@@ -197,64 +216,67 @@
     <ClCompile Include="..\src\lib\protocols\wireguard.c" />
     <ClCompile Include="..\src\lib\protocols\wsd.c" />
     <ClCompile Include="..\src\lib\protocols\xiaomi.c" />
+    <ClCompile Include="..\src\lib\protocols\atg.c" />
     <ClCompile Include="..\src\lib\protocols\z3950.c" />
     <ClCompile Include="..\src\lib\protocols\zabbix.c" />
     <ClCompile Include="..\src\lib\third_party\src\ahocorasick.c" />
-    <ClCompile Include="..\src\lib\protocols\aimini.c" />
-    <ClCompile Include="..\src\lib\protocols\applejuice.c" />
+    <ClCompile Include="..\src\lib\third_party\src\roaring.c" />
+    <ClCompile Include="..\src\lib\third_party\src\shoco.c" />
+    <ClCompile Include="..\src\lib\third_party\src\kdtree.c" />
+    <ClCompile Include="..\src\lib\third_party\src\ball.c" />
+    <ClCompile Include="..\src\lib\third_party\src\aes.c" />
     <ClCompile Include="..\src\lib\protocols\armagetron.c" />
-    <ClCompile Include="..\src\lib\protocols\ayiya.c" />
     <ClCompile Include="..\src\lib\protocols\bgp.c" />
     <ClCompile Include="..\src\lib\protocols\bittorrent.c" />
-    <ClCompile Include="..\src\lib\protocols\btlib.c" />
     <ClCompile Include="..\src\lib\protocols\ciscovpn.c" />
     <ClCompile Include="..\src\lib\protocols\citrix.c" />
+    <ClCompile Include="..\src\lib\protocols\cip.c" />
+    <ClCompile Include="..\src\lib\protocols\cloudflare_warp.c" />
     <ClCompile Include="..\src\lib\protocols\coap.c" />
     <ClCompile Include="..\src\lib\protocols\corba.c" />
     <ClCompile Include="..\src\lib\protocols\crossfire.c" />
     <ClCompile Include="..\src\lib\protocols\dcerpc.c" />
     <ClCompile Include="..\src\lib\protocols\dhcp.c" />
     <ClCompile Include="..\src\lib\protocols\dhcpv6.c" />
-    <ClCompile Include="..\src\lib\protocols\directconnect.c" />
-    <ClCompile Include="..\src\lib\protocols\directdownloadlink.c" />
     <ClCompile Include="..\src\lib\protocols\dns.c" />
     <ClCompile Include="..\src\lib\protocols\dofus.c" />
     <ClCompile Include="..\src\lib\protocols\drda.c" />
     <ClCompile Include="..\src\lib\protocols\dropbox.c" />
     <ClCompile Include="..\src\lib\protocols\eaq.c" />
     <ClCompile Include="..\src\lib\protocols\edonkey.c" />
-    <ClCompile Include="..\src\lib\protocols\fasttrack.c" />
-    <ClCompile Include="..\src\lib\protocols\fiesta.c" />
-    <ClCompile Include="..\src\lib\protocols\florensia.c" />
     <ClCompile Include="..\src\lib\protocols\ftp_control.c" />
     <ClCompile Include="..\src\lib\protocols\ftp_data.c" />
+    <ClCompile Include="..\src\lib\protocols\gearup_booster.c" />
     <ClCompile Include="..\src\lib\protocols\git.c" />
     <ClCompile Include="..\src\lib\protocols\gnutella.c" />
     <ClCompile Include="..\src\lib\protocols\gtp.c" />
-    <ClCompile Include="..\src\lib\protocols\guildwars.c" />
+    <ClCompile Include="..\src\lib\protocols\guildwars2.c" />
     <ClCompile Include="..\src\lib\protocols\h323.c" />
-    <ClCompile Include="..\src\lib\protocols\halflife2_and_mods.c" />
-    <ClCompile Include="..\src\lib\protocols\hangout.c" />
+    <ClCompile Include="..\src\lib\protocols\hots.c" />
     <ClCompile Include="..\src\lib\protocols\http.c" />
+    <ClCompile Include="..\src\lib\protocols\http2.c" />
     <ClCompile Include="..\src\lib\protocols\iax.c" />
     <ClCompile Include="..\src\lib\protocols\icecast.c" />
     <ClCompile Include="..\src\lib\protocols\ipp.c" />
     <ClCompile Include="..\src\lib\protocols\irc.c" />
     <ClCompile Include="..\src\lib\protocols\jabber.c" />
     <ClCompile Include="..\src\lib\protocols\kakaotalk_voice.c" />
+    <ClCompile Include="..\src\lib\protocols\kcp.c" />
     <ClCompile Include="..\src\lib\protocols\kerberos.c" />
-    <ClCompile Include="..\src\lib\protocols\kontiki.c" />
+    <ClCompile Include="..\src\lib\protocols\lagofast.c" />
     <ClCompile Include="..\src\lib\protocols\ldap.c" />
-    <ClCompile Include="..\src\lib\protocols\lotus_notes.c" />
+    <ClCompile Include="..\src\lib\protocols\hcl_notes.c" />
     <ClCompile Include="..\src\lib\protocols\mail_imap.c" />
     <ClCompile Include="..\src\lib\protocols\mail_pop.c" />
     <ClCompile Include="..\src\lib\protocols\mail_smtp.c" />
-    <ClCompile Include="..\src\lib\protocols\maplestory.c" />
+    <ClCompile Include="..\src\lib\protocols\nexon.c" />
     <ClCompile Include="..\src\lib\protocols\megaco.c" />
     <ClCompile Include="..\src\lib\protocols\mgcp.c" />
+    <ClCompile Include="..\src\lib\protocols\monero.c" />
     <ClCompile Include="..\src\lib\protocols\mpegts.c" />
     <ClCompile Include="..\src\lib\protocols\mqtt.c" />
     <ClCompile Include="..\src\lib\protocols\mssql_tds.c" />
+    <ClCompile Include="..\src\lib\protocols\munin.c" />
     <ClCompile Include="..\src\lib\protocols\mysql.c" />
     <ClCompile Include="..\src\lib\protocols\netbios.c" />
     <ClCompile Include="..\src\lib\protocols\netflow.c" />
@@ -262,39 +284,42 @@
     <ClCompile Include="..\src\lib\protocols\noe.c" />
     <ClCompile Include="..\src\lib\protocols\non_tcp_udp.c" />
     <ClCompile Include="..\src\lib\protocols\ntp.c" />
-    <ClCompile Include="..\src\lib\protocols\openft.c" />
+    <ClCompile Include="..\src\lib\protocols\oicq.c" />
     <ClCompile Include="..\src\lib\protocols\openvpn.c" />
     <ClCompile Include="..\src\lib\protocols\oracle.c" />
     <ClCompile Include="..\src\lib\protocols\postgres.c" />
-    <ClCompile Include="..\src\lib\protocols\ppstream.c" />
     <ClCompile Include="..\src\lib\protocols\pptp.c" />
+    <ClCompile Include="..\src\lib\protocols\protobuf.c" />
     <ClCompile Include="..\src\lib\protocols\qq.c" />
     <ClCompile Include="..\src\lib\protocols\quic.c" />
-    <ClCompile Include="..\src\lib\protocols\radius.c" />
+    <ClCompile Include="..\src\lib\protocols\radius_proto.c" />
+    <ClCompile Include="..\src\lib\protocols\raft.c" />
     <ClCompile Include="..\src\lib\protocols\rdp.c" />
-    <ClCompile Include="..\src\lib\protocols\redis_net.c" />
+    <ClCompile Include="..\src\lib\protocols\resp.c" />
+    <ClCompile Include="..\src\lib\protocols\ripe_atlas.c" />
+    <ClCompile Include="..\src\lib\protocols\rmcp.c" />
+    <ClCompile Include="..\src\lib\protocols\roughtime.c" />
     <ClCompile Include="..\src\lib\protocols\rsync.c" />
-    <ClCompile Include="..\src\lib\protocols\rtcp.c" />
     <ClCompile Include="..\src\lib\protocols\rtmp.c" />
     <ClCompile Include="..\src\lib\protocols\rtp.c" />
     <ClCompile Include="..\src\lib\protocols\rtsp.c" />
     <ClCompile Include="..\src\lib\protocols\rx.c" />
     <ClCompile Include="..\src\lib\protocols\sflow.c" />
-    <ClCompile Include="..\src\lib\protocols\shoutcast.c" />
     <ClCompile Include="..\src\lib\protocols\sip.c" />
     <ClCompile Include="..\src\lib\protocols\skinny.c" />
-    <ClCompile Include="..\src\lib\protocols\skype.c" />
+    <ClCompile Include="..\src\lib\protocols\slp.c" />
     <ClCompile Include="..\src\lib\protocols\smb.c" />
     <ClCompile Include="..\src\lib\protocols\socks45.c" />
-    <ClCompile Include="..\src\lib\protocols\sopcast.c" />
+    <ClCompile Include="..\src\lib\protocols\sonos.c" />
+    <ClCompile Include="..\src\lib\protocols\source_engine.c" />
     <ClCompile Include="..\src\lib\protocols\spotify.c" />
     <ClCompile Include="..\src\lib\protocols\ssdp.c" />
     <ClCompile Include="..\src\lib\protocols\ssh.c" />
-    <ClCompile Include="..\src\lib\protocols\starcraft.c" />
-    <ClCompile Include="..\src\lib\protocols\stealthnet.c" />
+    <ClCompile Include="..\src\lib\protocols\blizzard.c" />
     <ClCompile Include="..\src\lib\protocols\steam.c" />
     <ClCompile Include="..\src\lib\protocols\stun.c" />
     <ClCompile Include="..\src\lib\protocols\syslog.c" />
+    <ClCompile Include="..\src\lib\protocols\tailscale.c" />
     <ClCompile Include="..\src\lib\protocols\tcp_udp.c" />
     <ClCompile Include="..\src\lib\protocols\teamspeak.c" />
     <ClCompile Include="..\src\lib\protocols\teamviewer.c" />
@@ -302,22 +327,76 @@
     <ClCompile Include="..\src\lib\protocols\telnet.c" />
     <ClCompile Include="..\src\lib\protocols\teredo.c" />
     <ClCompile Include="..\src\lib\protocols\tftp.c" />
-    <ClCompile Include="..\src\lib\protocols\thunder.c" />
-    <ClCompile Include="..\src\lib\protocols\tvuplayer.c" />
+    <ClCompile Include="..\src\lib\protocols\thrift.c" />
+    <ClCompile Include="..\src\lib\protocols\tplink_shp.c" />
+    <ClCompile Include="..\src\lib\protocols\tuya_lp.c" />
     <ClCompile Include="..\src\lib\protocols\ubntac2.c" />
     <ClCompile Include="..\src\lib\protocols\usenet.c" />
-    <ClCompile Include="..\src\lib\protocols\vhua.c" />
     <ClCompile Include="..\src\lib\protocols\viber.c" />
     <ClCompile Include="..\src\lib\protocols\vmware.c" />
     <ClCompile Include="..\src\lib\protocols\vnc.c" />
-    <ClCompile Include="..\src\lib\protocols\warcraft3.c" />
     <ClCompile Include="..\src\lib\protocols\whoisdas.c" />
-    <ClCompile Include="..\src\lib\protocols\world_of_kung_fu.c" />
-    <ClCompile Include="..\src\lib\protocols\world_of_warcraft.c" />
     <ClCompile Include="..\src\lib\protocols\xbox.c" />
     <ClCompile Include="..\src\lib\protocols\xdmcp.c" />
     <ClCompile Include="..\src\lib\protocols\zattoo.c" />
     <ClCompile Include="..\src\lib\protocols\zeromq.c" />
+    <ClCompile Include="..\src\lib\protocols\ptpv2.c" />
+    <ClCompile Include="..\src\lib\protocols\hart-ip.c" />
+    <ClCompile Include="..\src\lib\protocols\rtps.c" />
+    <ClCompile Include="..\src\lib\protocols\opc-ua.c" />
+    <ClCompile Include="..\src\lib\protocols\fins.c" />
+    <ClCompile Include="..\src\lib\protocols\ethersio.c" />
+    <ClCompile Include="..\src\lib\protocols\beckhoff_ads.c" />
+    <ClCompile Include="..\src\lib\protocols\iso9506-1-mms.c" />
+    <ClCompile Include="..\src\lib\protocols\ieee-c37118.c" />
+    <ClCompile Include="..\src\lib\protocols\ethersbus.c" />
+    <ClCompile Include="..\src\lib\protocols\profinet_io.c" />
+    <ClCompile Include="..\src\lib\protocols\hislip.c" />
+    <ClCompile Include="..\src\lib\protocols\uftp.c" />
+    <ClCompile Include="..\src\lib\protocols\openflow.c" />
+    <ClCompile Include="..\src\lib\protocols\json-rpc.c" />
+    <ClCompile Include="..\src\lib\protocols\kafka.c" />
+    <ClCompile Include="..\src\lib\protocols\nomachine.c" />
+    <ClCompile Include="..\src\lib\protocols\iec62056.c" />
+    <ClCompile Include="..\src\lib\protocols\hl7.c" />
+    <ClCompile Include="..\src\lib\protocols\dicom.c" />
+    <ClCompile Include="..\src\lib\protocols\ceph.c" />
+    <ClCompile Include="..\src\lib\protocols\steam_datagram_relay.c" />
+    <ClCompile Include="..\src\lib\protocols\mumble.c" />
+    <ClCompile Include="..\src\lib\protocols\yojimbo.c" />
+    <ClCompile Include="..\src\lib\protocols\zoom.c" />
+    <ClCompile Include="..\src\lib\protocols\stomp.c" />
+    <ClCompile Include="..\src\lib\protocols\radmin.c" />
+    <ClCompile Include="..\src\lib\protocols\gearman.c" />
+    <ClCompile Include="..\src\lib\protocols\tencent_games.c" />
+    <ClCompile Include="..\src\lib\protocols\gaijin_entertainment.c" />
+    <ClCompile Include="..\src\lib\protocols\c1222.c" />
+    <ClCompile Include="..\src\lib\protocols\dlep.c" />
+    <ClCompile Include="..\src\lib\protocols\bfd.c" />
+    <ClCompile Include="..\src\lib\protocols\netease_games.c" />
+    <ClCompile Include="..\src\lib\protocols\path_of_exile.c" />
+    <ClCompile Include="..\src\lib\protocols\pfcp.c" />
+    <ClCompile Include="..\src\lib\protocols\flute.c" />
+    <ClCompile Include="..\src\lib\protocols\lol_wild_rift.c" />
+    <ClCompile Include="..\src\lib\protocols\teso.c" />
+    <ClCompile Include="..\src\lib\protocols\ldp.c" />
+    <ClCompile Include="..\src\lib\protocols\knxnet_ip.c" />
+    <ClCompile Include="..\src\lib\protocols\bfcp.c" />
+    <ClCompile Include="..\src\lib\protocols\iqiyi.c" />
+    <ClCompile Include="..\src\lib\protocols\egd.c" />
+    <ClCompile Include="..\src\lib\protocols\cod_mobile.c" />
+    <ClCompile Include="..\src\lib\protocols\zug.c" />
+    <ClCompile Include="..\src\lib\protocols\jrmi.c" />
+    <ClCompile Include="..\src\lib\protocols\nano.c" />
+    <ClCompile Include="..\src\lib\protocols\openwire.c" />
+    <ClCompile Include="..\src\lib\protocols\cnp-ip.c" />
+    <ClCompile Include="..\src\lib\protocols\trdp.c" />
+    <ClCompile Include="..\src\lib\protocols\lustre.c" />
+    <ClCompile Include="..\src\lib\protocols\dingtalk.c" />
+    <ClCompile Include="..\src\lib\protocols\paltalk.c" />
+    <ClCompile Include="..\src\lib\protocols\msdo.c" />
+    <ClCompile Include="..\src\lib\protocols\melsec.c" />
+    <ClCompile Include="..\src\lib\protocols\hamachi.c" />
     <ClCompile Include="..\src\lib\third_party\src\gcrypt_light.c" />
     <ClCompile Include="..\src\lib\third_party\src\libcache.c" />
     <ClCompile Include="..\src\lib\third_party\src\libinjection_html5.c" />
@@ -326,8 +405,11 @@
     <ClCompile Include="..\src\lib\third_party\src\ndpi_md5.c" />
     <ClCompile Include="..\src\lib\third_party\src\ndpi_patricia.c" />
     <ClCompile Include="..\src\lib\third_party\src\ndpi_sha1.c" />
+    <ClCompile Include="..\src\lib\third_party\src\ndpi_sha256.c" />
     <ClCompile Include="..\src\lib\third_party\src\sha1-fast.c" />
     <ClCompile Include="..\src\lib\third_party\src\strptime.c" />
+    <ClCompile Include="..\src\lib\third_party\src\hll\MurmurHash3.c" />
+    <ClCompile Include="..\src\lib\third_party\src\hll\hll.c" />
     <ClCompile Include="src\getopt.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -340,8 +422,7 @@
     <ClInclude Include="..\src\include\ndpi_encryption.h" />
     <ClInclude Include="..\src\include\ndpi_main.h" />
     <ClInclude Include="..\src\include\ndpi_patricia_typedefs.h" />
-    <ClInclude Include="..\src\include\ndpi_utils.h" />
-    <ClInclude Include="..\src\lib\protocols\btlib.h" />
+    <ClInclude Include="..\src\lib\ndpi_replace_printf.h" />
     <ClInclude Include="..\src\lib\third_party\include\ahocorasick.h" />
     <ClInclude Include="..\src\include\ndpi_includes.h" />
     <ClInclude Include="..\src\lib\third_party\include\gcrypt_light.h" />
@@ -356,7 +437,6 @@
     <ClInclude Include="..\src\lib\third_party\include\ndpi_md5.h" />
     <ClInclude Include="..\src\lib\third_party\include\ndpi_patricia.h" />
     <ClInclude Include="..\src\include\ndpi_protocol_ids.h" />
-    <ClInclude Include="..\src\include\ndpi_protocols.h" />
     <ClInclude Include="..\src\include\ndpi_typedefs.h" />
     <ClInclude Include="..\src\include\ndpi_unix.h" />
     <ClInclude Include="..\src\include\ndpi_win32.h" />
@@ -364,12 +444,14 @@
     <ClInclude Include="..\src\lib\third_party\include\rce_injection.h" />
     <ClInclude Include="..\src\lib\third_party\include\roaring.h" />
     <ClInclude Include="..\src\lib\third_party\include\uthash.h" />
+    <ClInclude Include="..\src\lib\ndpi_private.h" />
     <ClInclude Include="arpa\inet.h" />
     <ClInclude Include="src\getopt.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="src\ndpi_config.h" />
     <ClInclude Include="src\ndpi_define.h" />
+    <ClInclude Include="src\dirent.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\build-msbuild.yml" />

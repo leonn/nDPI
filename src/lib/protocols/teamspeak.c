@@ -22,6 +22,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_TEAMSPEAK
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static void ndpi_int_teamspeak_add_connection(struct ndpi_detection_module_struct
                                               *ndpi_struct, struct ndpi_flow_struct *flow)
@@ -30,7 +31,7 @@ static void ndpi_int_teamspeak_add_connection(struct ndpi_detection_module_struc
 }
 
 
-void ndpi_search_teamspeak(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_teamspeak(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
@@ -42,6 +43,7 @@ void ndpi_search_teamspeak(struct ndpi_detection_module_struct *ndpi_struct, str
       {
         NDPI_LOG_INFO(ndpi_struct, "found TEAMSPEAK udp\n");
         ndpi_int_teamspeak_add_connection(ndpi_struct, flow);
+        return;
       }
     } else if(packet->tcp != NULL) {
       /* https://github.com/Youx/soliloque-server/wiki/Connection-packet */
@@ -51,24 +53,51 @@ void ndpi_search_teamspeak(struct ndpi_detection_module_struct *ndpi_struct, str
       {
         NDPI_LOG_INFO(ndpi_struct, "found TEAMSPEAK tcp\n");
         ndpi_int_teamspeak_add_connection(ndpi_struct, flow);
+        return;
       }  /* http://www.imfirewall.com/en/protocols/teamSpeak.htm  */
     }
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  if (packet->udp != NULL)
+  {
+    if (packet->payload_packet_len == 16 &&
+        packet->payload[0] == 0x01 && packet->payload[3] == 0x02 &&
+        get_u_int32_t(packet->payload, 11) == 0x00000000 && packet->payload[15] == 0x00)
+    {
+      goto ts3_license_weblist;
+    }
+
+    if ((packet->payload_packet_len == 4 || packet->payload_packet_len == 8) &&
+        packet->payload[0] == 0x01 && packet->payload[3] == 0x01)
+    {
+      goto ts3_license_weblist;
+    }
+
+    if (packet->payload_packet_len == 5 &&
+        packet->payload[0] == 0x01 && packet->payload[3] == 0x02 &&
+        packet->payload[4] == 0x00)
+    {
+      goto ts3_license_weblist;
+    }
+  }
+
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
   return;
+
+ts3_license_weblist:
+  if (flow->packet_counter == 3)
+  {
+    NDPI_LOG_INFO(ndpi_struct, "found TEAMSPEAK license/weblist\n");
+    ndpi_int_teamspeak_add_connection(ndpi_struct, flow);
+    return;
+  }
 }
 
-void init_teamspeak_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id,
-                              NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_teamspeak_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("TeamSpeak", ndpi_struct, detection_bitmask, *id,
-                                      NDPI_PROTOCOL_TEAMSPEAK,
-                                      ndpi_search_teamspeak,
-                                      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-                                      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-                                      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("TeamSpeak", ndpi_struct,
+                     ndpi_search_teamspeak,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_TEAMSPEAK);
 }
 

@@ -26,6 +26,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_APPLE_PUSH
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static int is_apple_push_addr(const struct ndpi_packet_struct *packet)
 {
@@ -82,27 +83,22 @@ static void ndpi_check_apple_push(struct ndpi_detection_module_struct *ndpi_stru
     }
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
-void ndpi_search_apple_push(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_apple_push(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   NDPI_LOG_DBG(ndpi_struct, "search apple_push\n");
 
-  /* skip marked packets */
-  if(flow->detected_protocol_stack[0] != NDPI_PROTOCOL_APPLE_PUSH)
-    ndpi_check_apple_push(ndpi_struct, flow);
+  ndpi_check_apple_push(ndpi_struct, flow);
 }
 
 
-void init_apple_push_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_apple_push_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("APPLE_PUSH", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_APPLE_PUSH,
-				      ndpi_search_apple_push,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-  *id += 1;
+  register_dissector("APPLE_PUSH", ndpi_struct,
+                     ndpi_search_apple_push,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_APPLE_PUSH);
 }
 

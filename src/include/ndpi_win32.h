@@ -1,7 +1,7 @@
 /*
  * ndpi_win32.h
  *
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -59,6 +59,10 @@
 #define strdup _strdup
 #endif
 
+#ifndef F_OK
+#define F_OK 0
+#endif
+
 extern char* strsep(char **sp, char *sep);
 
 typedef unsigned char  u_char;
@@ -77,5 +81,10 @@ typedef unsigned       __int64 u_int64_t;
 
 /* https://stackoverflow.com/questions/7993050/multiplatform-atomic-increment */
 #define __sync_fetch_and_add(a,b)       InterlockedExchangeAdd ((a), b)
+
+#if defined(WIN32) || defined(WIN64)
+#include <intrin.h>
+#define __builtin_popcount __popcnt
+#endif
 
 #endif /* __NDPI_WIN32_H__ */

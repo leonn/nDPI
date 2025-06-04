@@ -2,7 +2,7 @@
  * jabber.c
  *
  * Copyright (C) 2009-11 - ipoque GmbH
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -27,6 +27,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_JABBER
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 struct jabber_string {
   char *string;
@@ -52,8 +53,6 @@ static void check_content_type_and_change_protocol(struct ndpi_detection_module_
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   int i, left = packet->payload_packet_len-x;
 
-  if(left <= 0) return;
-
   for(i=0; jabber_strings[i].string != NULL; i++) {
     if(ndpi_strnstr((const char*)&packet->payload[x], jabber_strings[i].string, left) != NULL) {    
       ndpi_int_jabber_add_connection(ndpi_struct, flow, jabber_strings[i].ndpi_protocol, NDPI_CONFIDENCE_DPI);
@@ -62,7 +61,7 @@ static void check_content_type_and_change_protocol(struct ndpi_detection_module_
   }  
 }
 
-void ndpi_search_jabber_tcp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_jabber_tcp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int16_t const max_packets = 4;
@@ -78,6 +77,7 @@ void ndpi_search_jabber_tcp(struct ndpi_detection_module_struct *ndpi_struct, st
     if (flow->packet_counter > max_packets - 1)
     {
       ndpi_int_jabber_add_connection(ndpi_struct, flow, NDPI_PROTOCOL_JABBER, NDPI_CONFIDENCE_DPI);
+      return;
     }
     for (i = 0; i < NDPI_ARRAY_LENGTH(valid_patterns); ++i)
     {
@@ -86,6 +86,8 @@ void ndpi_search_jabber_tcp(struct ndpi_detection_module_struct *ndpi_struct, st
         return;
       }
     }
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
+    return;
   }
 
   /* search for jabber here */
@@ -93,7 +95,7 @@ void ndpi_search_jabber_tcp(struct ndpi_detection_module_struct *ndpi_struct, st
   if (packet->payload_packet_len >= NDPI_STATICSTRING_LEN("<presence ") &&
       memcmp(packet->payload, "<presence ", NDPI_STATICSTRING_LEN("<presence ")) == 0 &&
       ndpi_strnstr((const char *)&packet->payload[0],
-                   "xmlns='http://jabber.org/protocol/caps'", packet->payload_packet_len) != NULL)
+                   "xmlns='http://jabber.org/protocol/", packet->payload_packet_len) != NULL)
   {
     ndpi_int_jabber_add_connection(ndpi_struct, flow, NDPI_PROTOCOL_JABBER, NDPI_CONFIDENCE_DPI);
     return;
@@ -128,26 +130,20 @@ void ndpi_search_jabber_tcp(struct ndpi_detection_module_struct *ndpi_struct, st
 
       /* search for subprotocols */
       check_content_type_and_change_protocol(ndpi_struct, flow, 13);
-      return;
     }
-  }
-
-  if (flow->packet_counter > max_packets) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
     return;
   }
+
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
+  return;
 }
 
 
-void init_jabber_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_jabber_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("Jabber", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_JABBER,
-				      ndpi_search_jabber_tcp,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("Jabber", ndpi_struct,
+                      ndpi_search_jabber_tcp,
+                      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                      1, NDPI_PROTOCOL_JABBER);
 }
 

@@ -1,6 +1,12 @@
 AR=@AR@
 CC=@CC@
 CXX=@CXX@
+ifneq ($(OS),Windows_NT)
+OS := $(shell uname)
+endif
+ifeq ($(OS),Darwin)
+CC=clang -fno-color-diagnostics
+endif
 BUILD_MINGW=@BUILD_MINGW@
 BUILD_MINGW_X64=@BUILD_MINGW_X64@
 DISABLE_NPCAP=@DISABLE_NPCAP@
@@ -9,7 +15,7 @@ SRCHOME=../src
 ifneq ($(OS),Windows_NT)
 CFLAGS+=-fPIC -DPIC
 endif
-CFLAGS+=-I$(SRCHOME)/include @NDPI_CFLAGS@ @PCAP_INC@ @GPROF_CFLAGS@
+CFLAGS+=-I$(SRCHOME)/include @NDPI_CFLAGS@ @PCAP_INC@ @GPROF_CFLAGS@ @CUSTOM_NDPI@
 LDFLAGS+=@NDPI_LDFLAGS@
 LIBNDPI=$(SRCHOME)/lib/libndpi.a
 LIBS=$(LIBNDPI) @PCAP_LIB@ @ADDITIONAL_LIBS@ @LIBS@ @GPROF_LIBS@
@@ -79,7 +85,7 @@ cppcheck:
 	 cppcheck --template='{file}:{line}:{severity}:{message}' --quiet --enable=all --force -I$(SRCHOME)/include *.c
 
 clean:
-	/bin/rm -f *.o ndpiReader ndpiSimpleIntegration ndpiReader$(EXE_SUFFIX) ndpiSimpleIntegration$(EXE_SUFFIX) ndpiReader.dpdk
+	/bin/rm -f *.o ndpiReader ndpiSimpleIntegration ndpiReader$(EXE_SUFFIX) ndpiSimpleIntegration$(EXE_SUFFIX) ndpiReader.dpdk libndpiReader.a
 	/bin/rm -f .*.dpdk.cmd .*.o.cmd *.dpdk.map .*.o.d
 	/bin/rm -f _install _postbuild _postinstall _preinstall
 	/bin/rm -rf build
@@ -90,6 +96,7 @@ distdir:
 		-o -name '*.h' \
 		-o -name '*.py' \
 		-o -name '*.txt' \
+		-o -name '*.conf' \
 		-o -name '*.csv' | xargs -I'{}' cp '{}' '$(distdir)/{}'
 
 distclean: clean

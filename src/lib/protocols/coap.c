@@ -26,6 +26,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_COAP
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 
 #define CON     0
@@ -39,6 +40,8 @@ struct ndpi_coap_hdr
   u_int8_t version:2, type:2, tkl:4;
 #elif defined(__LITTLE_ENDIAN__)
   u_int8_t tkl:4, type:2, version:2;
+#else
+#error "Missing endian macro definitions."
 #endif
   u_int8_t code;
   u_int16_t message_id; //if needed, remember to convert in host number
@@ -103,15 +106,11 @@ static int isCoAPport(u_int16_t port) {
 /**
  * Dissector function that searches CoAP headers
  */
-void ndpi_search_coap (struct ndpi_detection_module_struct *ndpi_struct,
-		       struct ndpi_flow_struct *flow)
+static void ndpi_search_coap(struct ndpi_detection_module_struct *ndpi_struct,
+			    struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   struct ndpi_coap_hdr * h = (struct ndpi_coap_hdr*) packet->payload;
-
-  if(flow->detected_protocol_stack[0] != NDPI_PROTOCOL_UNKNOWN) {
-    return;
-  }
 
   // search for udp packet
   if(packet->udp != NULL) {
@@ -120,7 +119,7 @@ void ndpi_search_coap (struct ndpi_detection_module_struct *ndpi_struct,
 
     if((!isCoAPport(s_port) && !isCoAPport(d_port))
        || (packet->payload_packet_len < 4) ) {   // header too short
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       return;
     }
 
@@ -143,21 +142,18 @@ void ndpi_search_coap (struct ndpi_detection_module_struct *ndpi_struct,
     }
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
   return;
 }
 
 /**
  * Entry point for the ndpi library
  */
-void init_coap_dissector (struct ndpi_detection_module_struct *ndpi_struct,
-			  u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_coap_dissector (struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection ("COAP", ndpi_struct, detection_bitmask, *id,
-				       NDPI_PROTOCOL_COAP,
-				       ndpi_search_coap,
-				       NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-				       SAVE_DETECTION_BITMASK_AS_UNKNOWN, ADD_TO_DETECTION_BITMASK);
-  *id +=1;
+  register_dissector("COAP", ndpi_struct,
+                     ndpi_search_coap,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_COAP);
 }
 

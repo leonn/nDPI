@@ -1,4 +1,5 @@
-#!/bin/bash -eu
+#!/usr/bin/env bash
+set -eu
 # Copyright 2019 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,19 +15,58 @@
 # limitations under the License.
 #
 ################################################################################
+
+if [[ "$SANITIZER" != "memory" ]]; then
+	#Disable code instrumentation
+	CFLAGS_SAVE="$CFLAGS"
+	CXXFLAGS_SAVE="$CXXFLAGS"
+	unset CFLAGS
+	unset CXXFLAGS
+	export AFL_NOOPT=1
+fi
+
 # build libpcap
 tar -xvzf libpcap-1.9.1.tar.gz
 cd libpcap-1.9.1
 ./configure --disable-shared
-make -j"$(nproc)"
+make -j$(nproc)
 make install
 cd ..
+
+if [[ "$SANITIZER" != "memory" ]]; then
+	#Re-enable code instrumentation
+	export CFLAGS="${CFLAGS_SAVE}"
+	export CXXFLAGS="${CXXFLAGS_SAVE}"
+	unset AFL_NOOPT
+fi
+
 # build project
 cd ndpi
-sh autogen.sh
-./configure --enable-fuzztargets
-make
-make -C fuzz fuzz_ndpi_reader_seed_corpus.zip
-# copy fuzz executables to output directory
-cp -v fuzz/fuzz_ndpi_reader "$OUT/"
-cp -v fuzz/fuzz_process_packet "$OUT/"
+# Set LDFLAGS variable and `--with-only-libndpi` option as workaround for the
+# "missing dependencies errors" in the introspector build. See #8939
+RANLIB=llvm-ranlib LDFLAGS="-L/usr/local/lib -lpcap" ./autogen.sh --enable-fuzztargets --with-only-libndpi --enable-tls-sigs
+make -j$(nproc)
+# Copy fuzzers
+ls fuzz/fuzz* | grep -v "\." | while read -r i; do cp "$i" "$OUT"/; done
+# Copy dictionaries
+cp fuzz/*.dict "$OUT"/
+# Copy seed corpus
+cp fuzz/*.zip "$OUT"/
+# Copy options
+cp fuzz/*.options "$OUT"/
+# Copy configuration files
+cp example/protos.txt "$OUT"/
+cp example/categories.txt "$OUT"/
+cp example/risky_domains.txt "$OUT"/
+cp example/ja4_fingerprints.csv "$OUT"/
+cp example/sha1_fingerprints.csv "$OUT"/
+cp example/config.txt "$OUT"/
+cp example/*.conf "$OUT"/
+cp lists/public_suffix_list.dat "$OUT"/
+cp fuzz/ipv*_addresses.txt "$OUT"/
+cp fuzz/bd_param.txt "$OUT"/
+cp fuzz/splt_param.txt "$OUT"/
+cp fuzz/random_list.list "$OUT"/
+mkdir -p "$OUT"/lists
+# Ignore a huge list to speed up init time
+find lists/*.list ! -name 100_malware.list -exec cp -t "$OUT"/lists/ {} +

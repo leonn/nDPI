@@ -1,7 +1,7 @@
 /*
  * gtp.c
  *
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  * 
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -23,6 +23,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_GTP
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 
 /* This code handles: GTP-U (port 2152), GTP-C (v1 and v2; port 2123) and GTP-PRIME
@@ -67,7 +68,7 @@ static void ndpi_check_gtp(struct ndpi_detection_module_struct *ndpi_struct, str
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int32_t payload_len = packet->payload_packet_len;
 
-  if((packet->udp != NULL) && (payload_len > sizeof(struct gtp_header_generic))) {
+  if(payload_len > sizeof(struct gtp_header_generic)) {
     u_int32_t gtp_u  = ntohs(2152);
     u_int32_t gtp_c  = ntohs(2123);
     u_int32_t gtp_prime = ntohs(3386);
@@ -114,28 +115,22 @@ static void ndpi_check_gtp(struct ndpi_detection_module_struct *ndpi_struct, str
     }
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
   return;
 }
 
-void ndpi_search_gtp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_gtp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   NDPI_LOG_DBG(ndpi_struct, "search gtp\n");
 
-  /* skip marked packets */
-  if(flow->detected_protocol_stack[0] != NDPI_PROTOCOL_GTP)
-    ndpi_check_gtp(ndpi_struct, flow);
+  ndpi_check_gtp(ndpi_struct, flow);
 }
 
 
-void init_gtp_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_gtp_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("GTP", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_GTP,
-				      ndpi_search_gtp,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("GTP", ndpi_struct,
+                     ndpi_search_gtp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_GTP);
 }

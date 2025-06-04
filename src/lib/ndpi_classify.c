@@ -41,8 +41,6 @@
  *
  */
 
-#define _GNU_SOURCE
-
 #include <stdio.h>
 #include <ctype.h>
 // #include <sys/time.h>
@@ -53,6 +51,8 @@
 #include "ndpi_classify.h"
 #include "ndpi_includes.h"
 
+#include "ndpi_replace_printf.h"
+
 /** finds the minimum value between to inputs */
 #ifndef min
 #define min(a,b)				\
@@ -61,6 +61,7 @@
     _a < _b ? _a : _b; })
 #endif
 
+/* **************************************** */
 
 //bias (1) + w (207)
 //const float ndpi_parameters_splt[NUM_PARAMETERS_SPLT_LOGREG] = {
@@ -240,6 +241,8 @@ float ndpi_parameters_bd[NUM_PARAMETERS_BD_LOGREG] = {
 						      0.000000000000000000e+00, 0.000000000000000000e+00, -9.635140703414636576e+00, 2.603288107669730511e+00,
 };
 
+/* **************************************** */
+
 /**
  * \fn void ndpi_merge_splt_arrays (const uint16_t *pkt_len, const pkt_timeval *pkt_time,
  const uint16_t *pkt_len_twin, const pkt_timeval *pkt_time_twin,
@@ -268,9 +271,11 @@ ndpi_merge_splt_arrays (const uint16_t *pkt_len, const pkt_timeval *pkt_time,
                         uint16_t *merged_lens, uint16_t *merged_times)
 {
   int s,r;
-  pkt_timeval ts_start = { 0, 0 }; /* initialize to avoid spurious warnings */
+  pkt_timeval ts_start;
   pkt_timeval tmp, tmp_r;
   pkt_timeval start_m;
+
+  ndpi_timer_clear(&ts_start);
 
   if(r_idx + s_idx == 0) {
     return ;
@@ -340,6 +345,8 @@ ndpi_merge_splt_arrays (const uint16_t *pkt_len, const pkt_timeval *pkt_time,
     merged_times[0] = ndpi_timeval_to_microseconds(start_m);
 }
 
+/* **************************************** */
+
 /* transform lens array to Markov chain */
 static void
 ndpi_get_mc_rep_lens (uint16_t *lens, float *length_mc, uint16_t num_packets)
@@ -380,6 +387,8 @@ ndpi_get_mc_rep_lens (uint16_t *lens, float *length_mc, uint16_t num_packets)
   }
 }
 
+/* **************************************** */
+
 /* transform times array to Markov chain */
 void
 ndpi_get_mc_rep_times (uint16_t *times, float *time_mc, uint16_t num_packets)
@@ -419,6 +428,8 @@ ndpi_get_mc_rep_times (uint16_t *times, float *time_mc, uint16_t num_packets)
   }
 }
 
+/* **************************************** */
+
 /**
  * \fn float classify (const unsigned short *pkt_len, const pkt_timeval *pkt_time,
  const unsigned short *pkt_len_twin, const pkt_timeval *pkt_time_twin,
@@ -450,8 +461,7 @@ ndpi_classify (const unsigned short *pkt_len, const pkt_timeval *pkt_time,
                const unsigned short *pkt_len_twin, const pkt_timeval *pkt_time_twin,
                pkt_timeval start_time, pkt_timeval start_time_twin, uint32_t max_num_pkt_len,
                uint16_t sp, uint16_t dp, uint32_t op, uint32_t ip, uint32_t np_o, uint32_t np_i,
-               uint32_t ob, uint32_t ib, uint16_t use_bd, const uint32_t *bd, const uint32_t *bd_t)
-{
+               uint32_t ob, uint32_t ib, uint16_t use_bd, const uint32_t *bd, const uint32_t *bd_t) {
 
   float features[NUM_PARAMETERS_BD_LOGREG] = {1.0};
   float mc_lens[MC_BINS_LEN*MC_BINS_LEN];
@@ -537,6 +547,8 @@ ndpi_classify (const unsigned short *pkt_len, const pkt_timeval *pkt_time,
   return 1.0/(1.0+exp(score));
 }
 
+/* **************************************** */
+
 /**
  * \fn void update_params (char *splt_params, char *bd_params)
  * \brief if a user supplies new parameter files, update parameters splt/bd
@@ -547,9 +559,9 @@ ndpi_classify (const unsigned short *pkt_len, const pkt_timeval *pkt_time,
 void
 ndpi_update_params (classifier_type_codes_t param_type, const char *param_file)
 {
-  float param;
+  float param = 0.0;
   FILE *fp;
-  int count = 0;
+  int count;
 
   switch (param_type) {
   case (SPLT_PARAM_TYPE):
@@ -583,10 +595,14 @@ ndpi_update_params (classifier_type_codes_t param_type, const char *param_file)
     break;
 
   default:
+#if 0
     printf("error: unknown paramerter type (%d)", param_type);
+#endif
     break;
   }
 }
+
+/* **************************************** */
 
 /* *********************************************************************
  * ---------------------------------------------------------------------
@@ -615,6 +631,8 @@ ndpi_timer_eq(const pkt_timeval *a,
   return 0;
 }
 
+/* **************************************** */
+
 unsigned int
 ndpi_timer_lt(const pkt_timeval *a,
               const pkt_timeval *b)
@@ -635,13 +653,15 @@ ndpi_timer_sub(const pkt_timeval *a,
                const pkt_timeval *b,
                pkt_timeval *result)
 {
-  result->tv_sec = a->tv_sec - b->tv_sec;
-  result->tv_usec = a->tv_usec - b->tv_usec;
+  result->tv_sec = (unsigned long long)a->tv_sec - (unsigned long long)b->tv_sec;
+  result->tv_usec = (unsigned long long)a->tv_usec - (unsigned long long)b->tv_usec;
   if(result->tv_usec < 0) {
     --result->tv_sec;
     result->tv_usec += 1000000;
   }
 }
+
+/* **************************************** */
 
 /**
  * \brief Zeroize a timeval.
@@ -654,6 +674,8 @@ ndpi_timer_clear(pkt_timeval *a)
   a->tv_sec = a->tv_usec = 0;
 }
 
+/* **************************************** */
+
 /**
  * \brief Calculate the milliseconds representation of a timeval.
  * \param ts Timeval
@@ -662,9 +684,12 @@ ndpi_timer_clear(pkt_timeval *a)
 u_int64_t
 ndpi_timeval_to_milliseconds(pkt_timeval ts)
 {
-  u_int64_t result = ts.tv_usec / 1000 + ts.tv_sec * 1000;
-  return result;
+  u_int64_t sec = ts.tv_sec;
+  u_int64_t usec = ts.tv_usec;
+  return usec / 1000 + sec * 1000;
 }
+
+/* **************************************** */
 
 /**
  * \brief Calculate the microseconds representation of a timeval.
@@ -674,21 +699,24 @@ ndpi_timeval_to_milliseconds(pkt_timeval ts)
 u_int64_t
 ndpi_timeval_to_microseconds(pkt_timeval ts)
 {
-  u_int64_t result = ts.tv_usec + ts.tv_sec * 1000 * 1000;
-  return result;
+  u_int64_t sec = ts.tv_sec;
+  u_int64_t usec = ts.tv_usec;
+  return usec + sec * 1000 * 1000;
 }
+
+/* **************************************** */
 
 void
 ndpi_log_timestamp(char *log_ts, uint32_t log_ts_len)
 {
   pkt_timeval tv;
   time_t nowtime;
-  struct tm nowtm_r;
+  struct tm nowtm_r = { 0 };
   char tmbuf[NDPI_TIMESTAMP_LEN];
 
   gettimeofday(&tv, NULL);
   nowtime = tv.tv_sec;
-#ifdef WIN32
+#if defined(WIN32) || defined(_MSC_VER)
   /* localtime() on Windows is thread-safe */
   struct tm * nowtm_r_ptr = localtime(&nowtime);
   nowtm_r = *nowtm_r_ptr;

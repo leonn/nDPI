@@ -23,18 +23,19 @@
 
 #include "ndpi_protocol_ids.h"
 
-#define NDPI_CURRENT_PROTO NDPI_PROTOCOL_RPC
+#define NDPI_CURRENT_PROTO NDPI_PROTOCOL_DCERPC
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 #include <stdbool.h>
 
 static void ndpi_int_dcerpc_add_connection(struct ndpi_detection_module_struct
 					     *ndpi_struct, struct ndpi_flow_struct *flow)
 {
-  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_RPC, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
+  ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_DCERPC, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
-bool is_connection_oriented_dcerpc(struct ndpi_packet_struct *packet, struct ndpi_flow_struct *flow)
+static bool is_connection_oriented_dcerpc(struct ndpi_packet_struct *packet)
 {
   if((packet->tcp != NULL)
      && (packet->payload_packet_len >= 64)
@@ -47,7 +48,7 @@ bool is_connection_oriented_dcerpc(struct ndpi_packet_struct *packet, struct ndp
   return false;
 }
 
-bool is_connectionless_dcerpc(struct ndpi_packet_struct *packet, struct ndpi_flow_struct *flow)
+static bool is_connectionless_dcerpc(struct ndpi_packet_struct *packet)
 {
   u_int16_t fragment_len;
   
@@ -77,29 +78,26 @@ bool is_connectionless_dcerpc(struct ndpi_packet_struct *packet, struct ndpi_flo
   return true;
 }
 
-void ndpi_search_dcerpc(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_dcerpc(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   NDPI_LOG_DBG(ndpi_struct, "search DCERPC\n");
-  if (is_connection_oriented_dcerpc(packet, flow) || is_connectionless_dcerpc(packet, flow)) {
+  if (is_connection_oriented_dcerpc(packet) || is_connectionless_dcerpc(packet)) {
     NDPI_LOG_INFO(ndpi_struct, "found DCERPC\n");
     ndpi_int_dcerpc_add_connection(ndpi_struct, flow);
     return;
   }
 
   if(packet->payload_packet_len>1)
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 
-void init_dcerpc_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_dcerpc_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("RPC", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_RPC,
-				      ndpi_search_dcerpc,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-  *id += 1;
+  register_dissector("DCERPC", ndpi_struct,
+                     ndpi_search_dcerpc,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_DCERPC);
 }

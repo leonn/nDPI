@@ -22,6 +22,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_SKINNY
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 /* Reference: Wiresahrk: epan/dissectors/packet-skinny.c */
 
@@ -59,7 +60,7 @@ static int is_valid_opcode(u_int32_t opcode)
   return 0;
 }
 
-void ndpi_search_skinny(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_skinny(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int16_t dport, sport;
@@ -86,18 +87,14 @@ void ndpi_search_skinny(struct ndpi_detection_module_struct *ndpi_struct, struct
       }
     }
   }
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 
-void init_skinny_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_skinny_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("CiscoSkinny", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_SKINNY,
-				      ndpi_search_skinny,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("CiscoSkinny", ndpi_struct,
+                     ndpi_search_skinny,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_SKINNY);
 }

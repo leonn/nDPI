@@ -7,19 +7,21 @@ nDPI provides a set of threat detection features available through NDPI_RISK det
 
 As part of these features, we provide DGA detection.
 
-Domain generation algorithms (DGA) are algorithms seen in various families of malware that are used
+[Domain generation algorithms (DGA)](https://en.wikipedia.org/wiki/Domain_generation_algorithm) are algorithms seen in various families of malware that are used
  to periodically generate a large number of domain names that can be used as rendezvous points with 
  their command and control servers.
  
 DGA detection heuristic is implemented [**here**](https://github.com/ntop/nDPI/blob/328ff2465709372c595cb25d99135aa515da3c5a/src/lib/ndpi_main.c#L6729).
 
-DGA performances test and tracking allows us to detect automatically if a modification is harmful.
+DGA performance tests and tracking allow us to detect automatically if a modification is harmful.
 
 The modification can be a simple threshold change or a future lightweight ML approach.
 
+Developers interested in DGA detection using ML should also visit [this folder](../../dga).
+
 ## Used data
 
-Original used dataset is a collection of legit and DGA domains (balanced) that can be obtained as follow:
+Original used dataset is a collection of legit and DGA domains (balanced) that can be obtained as follows:
 
 ```shell
 wget https://raw.githubusercontent.com/chrmor/DGA_domains_dataset/master/dga_domains_full.csv
@@ -66,5 +68,5 @@ You can evaluate your modifications performances before submitting it as follows
 ./do-dga.sh
 ```
 
-If your modifications decreases baseline performances, test will fails.
-If not (well done), test passed and you must update the baseline metrics with your obtained ones.
+If your modifications decreases baseline performances, test will fail.
+If not (well done), test passed, and you must update the baseline metrics with your obtained ones.

@@ -25,6 +25,7 @@
 
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_XBOX
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static void ndpi_int_xbox_add_connection(struct ndpi_detection_module_struct
 					 *ndpi_struct, struct ndpi_flow_struct *flow)
@@ -33,13 +34,12 @@ static void ndpi_int_xbox_add_connection(struct ndpi_detection_module_struct
 }
 
 
-void ndpi_search_xbox(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_xbox(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 	
   /*
    * XBOX UDP DETCTION ONLY
-   * the xbox TCP detection is done by http code
    * this detection also works for asymmetric xbox udp traffic
    */
   if(packet->udp != NULL) {
@@ -91,25 +91,18 @@ void ndpi_search_xbox(struct ndpi_detection_module_struct *ndpi_struct, struct n
 	return;
     }
 #endif
-
-    /* exclude here all non matched udp traffic, exclude here tcp only if http has been excluded, because xbox could use http */
-    if(NDPI_COMPARE_PROTOCOL_TO_BITMASK(flow->excluded_protocol_bitmask, NDPI_PROTOCOL_HTTP) != 0) {
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
-    }
   }
-  /* to not exclude tcp traffic here, done by http code... */
+
+  if(flow->packet_counter >= 5)
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 
-void init_xbox_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_xbox_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("Xbox", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_XBOX,
-				      ndpi_search_xbox,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("Xbox", ndpi_struct,
+                     ndpi_search_xbox,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_XBOX);
 }
 

@@ -1,10 +1,7 @@
 /*
  * ndpi_community_id.c
  *
- * Copyright (C) 2011-22 - ntop.org
- *
- * This file is part of nDPI, an open source deep packet inspection
- * library based on the OpenDPI and PACE technology by ipoque GmbH
+ * Copyright (C) 2011-25 - ntop.org and contributors
  *
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -67,10 +64,7 @@
 /* **************************************************** */
 
 static u_int16_t ndpi_community_id_buf_copy(u_int8_t * const dst, const void * const src, u_int16_t len) {
-  if(src)
-    memcpy(dst, src, len);
-  else
-    memset(dst, 0, len);
+  memcpy(dst, src, len);
 
   return len;
 }

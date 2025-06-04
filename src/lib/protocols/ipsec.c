@@ -1,7 +1,7 @@
 /*
  * ipsec.c
  *
- * Copyright (C) 2022 - ntop.org
+ * Copyright (C) 2022-23 - ntop.org
  *
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -23,6 +23,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_IPSEC
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 enum isakmp_type {
   ISAKMP_INVALID = 0,
@@ -38,7 +39,7 @@ static void ndpi_int_ipsec_add_connection(struct ndpi_detection_module_struct * 
   switch (isakmp_type)
   {
     case ISAKMP_INVALID:
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       return;
     case ISAKMP_MALFORMED:
       NDPI_LOG_INFO(ndpi_struct, "found malformed ISAKMP (UDP)\n");
@@ -126,8 +127,8 @@ static enum isakmp_type ndpi_int_check_isakmp_v2(struct ndpi_packet_struct const
   return isakmp_type;
 }
 
-void ndpi_search_ipsec(struct ndpi_detection_module_struct *ndpi_struct,
-                       struct ndpi_flow_struct *flow)
+static void ndpi_search_ipsec(struct ndpi_detection_module_struct *ndpi_struct,
+                              struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct * const packet = &ndpi_struct->packet;
   u_int16_t isakmp_offset = 0;
@@ -137,7 +138,7 @@ void ndpi_search_ipsec(struct ndpi_detection_module_struct *ndpi_struct,
 
   if (packet->payload_packet_len < 28)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -147,7 +148,7 @@ void ndpi_search_ipsec(struct ndpi_detection_module_struct *ndpi_struct,
     isakmp_offset = 4;
     if (packet->payload_packet_len < 32)
     {
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       return;
     }
   }
@@ -156,7 +157,7 @@ void ndpi_search_ipsec(struct ndpi_detection_module_struct *ndpi_struct,
   {
     if (packet->payload[isakmp_offset + 17] != 0x10 /* Major Version 1 */)
     {
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       return;
     } else {
       /* Version 1 is obsolete, but still used by some embedded devices. */
@@ -168,7 +169,7 @@ void ndpi_search_ipsec(struct ndpi_detection_module_struct *ndpi_struct,
 
   if (ntohl(get_u_int32_t(packet->payload, isakmp_offset + 24)) != (u_int32_t)packet->payload_packet_len - isakmp_offset)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -182,17 +183,11 @@ void ndpi_search_ipsec(struct ndpi_detection_module_struct *ndpi_struct,
   ndpi_int_ipsec_add_connection(ndpi_struct, flow, isakmp_type);
 }
 
-void init_ipsec_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-                          u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_ipsec_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("IPSec", ndpi_struct, detection_bitmask, *id,
-    NDPI_PROTOCOL_IPSEC,
-    ndpi_search_ipsec,
-    NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-    SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-    ADD_TO_DETECTION_BITMASK
-  );
-
-  *id += 1;
+  register_dissector("IPSec", ndpi_struct,
+                     ndpi_search_ipsec,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_IPSEC);
 }
 

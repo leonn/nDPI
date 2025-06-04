@@ -1,7 +1,7 @@
 /*
  * natpmp.c
  *
- * Copyright (C) 2022 - ntop.org
+ * Copyright (C) 2022-23 - ntop.org
  *
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -24,6 +24,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_NATPMP
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 #define NATPMP_PORT 5351
 
@@ -162,8 +163,8 @@ static int ndpi_search_natpmp_extra(struct ndpi_detection_module_struct *ndpi_st
   return 1;
 }
 
-void ndpi_search_natpmp(struct ndpi_detection_module_struct *ndpi_struct,
-                        struct ndpi_flow_struct *flow)
+static void ndpi_search_natpmp(struct ndpi_detection_module_struct *ndpi_struct,
+                               struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct const * const packet = &ndpi_struct->packet;
   enum natpmp_type natpmp_type;
@@ -172,7 +173,7 @@ void ndpi_search_natpmp(struct ndpi_detection_module_struct *ndpi_struct,
 
   if (natpmp_is_valid(packet, &natpmp_type) == 0)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -187,16 +188,10 @@ void ndpi_search_natpmp(struct ndpi_detection_module_struct *ndpi_struct,
   }
 }
 
-void init_natpmp_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-                           u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_natpmp_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("NAT-PMP", ndpi_struct, detection_bitmask, *id,
-    NDPI_PROTOCOL_NATPMP,
-    ndpi_search_natpmp,
-    NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-    SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-    ADD_TO_DETECTION_BITMASK
-  );
-
-  *id += 1;
+  register_dissector("NAT-PMP", ndpi_struct,
+                     ndpi_search_natpmp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_NATPMP);
 }

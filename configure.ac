@@ -1,4 +1,4 @@
-AC_INIT([libndpi],[4.5.0])
+AC_INIT([libndpi],[4.15.0])
 
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_MACRO_DIR([m4])
@@ -8,7 +8,7 @@ AM_INIT_AUTOMAKE([foreign subdir-objects])
 AC_PREFIX_DEFAULT(/usr)
 
 EXTRA_TARGETS="example tests tests/dga"
-AC_ARG_WITH(only-libndpi,  AS_HELP_STRING([--with-only-libndpi], [Build only libndpi (no examples, tests etc)]))
+AC_ARG_WITH(only-libndpi, AS_HELP_STRING([--with-only-libndpi], [Build only libndpi (no examples, tests etc)]))
 AS_IF([test "${with_only_libndpi+set}" = set],[
   EXTRA_TARGETS=""
 ])
@@ -16,19 +16,33 @@ AS_IF([test "${with_only_libndpi+set}" = set],[
 PWD=`pwd`
 
 
-AC_ARG_WITH(sanitizer,     AS_HELP_STRING([--with-sanitizer], [Build with support for address, undefined and leak sanitizer]))
+AC_ARG_WITH(sanitizer, AS_HELP_STRING([--with-sanitizer], [Build with support for address, undefined and leak sanitizer]))
 AC_ARG_WITH(thread-sanitizer, AS_HELP_STRING([--with-thread-sanitizer], [Build with support for thread sanitizer]))
 AC_ARG_WITH(memory-sanitizer, AS_HELP_STRING([--with-memory-sanitizer], [Build with support for memory sanitizer]))
+AC_ARG_WITH(macos-memory-sanitizer, AS_HELP_STRING([--with-macos-memory-sanitizer], [Build with support for memory sanitizer macOS]))
 AC_ARG_ENABLE(fuzztargets, AS_HELP_STRING([--enable-fuzztargets], [Enable fuzz targets]),[enable_fuzztargets=$enableval],[enable_fuzztargets=no])
 AC_ARG_ENABLE(gprof, AS_HELP_STRING([--enable-gprof], [Enable CPU/HEAP profiling with gperftools]),[enable_gprof=$enableval],[enable_gprof=no])
 AC_ARG_ENABLE(code-coverage, AS_HELP_STRING([--enable-code-coverage], [Generate Code Coverage report]))
-AC_ARG_WITH(local-libgcrypt,  AS_HELP_STRING([--with-local-libgcrypt], [Build with libgcrypt (if present) instead of the enclosed gcrypt light]))
+AC_ARG_WITH(local-libgcrypt, AS_HELP_STRING([--with-local-libgcrypt], [Build with libgcrypt (if present) instead of the enclosed gcrypt light]))
 AC_ARG_ENABLE(tls-sigs, AS_HELP_STRING([--enable-tls-sigs], [Enable TLS Client signature algorithm dissection. Rarely used, but requires significantly more memory.]))
 AC_ARG_ENABLE(npcap, AS_HELP_STRING([--disable-npcap], [msys2 only: Disable linkage against the wpcap/npcap import library in windows/WpdPack/Lib.]))
 AC_ARG_WITH(nbpf-path, AS_HELP_STRING([--with-nbpf-path], [nBPF library custom path; default: ${PWD}/../PF_RING/userland/nbpf]),[NBPF_HOME=$withval],[NBPF_HOME=${PWD}/../PF_RING/userland/nbpf])
+AC_ARG_WITH(lto-and-gold-linker, AS_HELP_STRING([--with-lto-and-gold-linker], [Build with LTO and Gold linker]))
+AC_ARG_ENABLE(debug-build, AS_HELP_STRING([--enable-debug-build], [Enable debug build (`-g` flag)]),[enable_debugbuild=$enableval],[enable_debugbuild=no])
+AC_ARG_ENABLE(global-context-support, AS_HELP_STRING([--disable-global-context-support], [Disable support for global context. No external dependency on libpthread]))
+AC_ARG_ENABLE(memory-track-origins, AS_HELP_STRING([--disable-memory-track-origins], [Don't add -fsanitize-memory-track-origins flag when compiling with MASAN support. Useful for faster CI]))
 
-AS_IF([test "x$enable_fuzztargets" = "xyes"], [BUILD_FUZZTARGETS=1], [BUILD_FUZZTARGETS=0])
+NDPI_CFLAGS="${NDPI_CFLAGS} -D_DEFAULT_SOURCE=1 -D_GNU_SOURCE=1"
+
+AS_IF([test "x$enable_fuzztargets" = "xyes"], [
+  BUILD_FUZZTARGETS=1
+  NDPI_CFLAGS="${NDPI_CFLAGS} -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION"
+], [BUILD_FUZZTARGETS=0])
 AM_CONDITIONAL([BUILD_FUZZTARGETS], [test "x$enable_fuzztargets" = "xyes"])
+
+AS_IF([test "x$enable_debugbuild" = "xyes"], [
+  NDPI_CFLAGS="${NDPI_CFLAGS} -g"
+])
 
 AS_IF([test "${with_sanitizer+set}" = set -a "${with_thread_sanitizer+set}" = set],[
   AC_MSG_ERROR([Configure options `--with-sanitizer' and `--with_thread_sanitizer' can not used at the same time.])
@@ -42,7 +56,8 @@ AS_IF([test "${with_thread_sanitizer+set}" = set -a "${with_memory_sanitizer+set
 AS_IF([test "${with_sanitizer+set}" = set -o "${with_thread_sanitizer+set}" = set -o "${with_memory_sanitizer+set}" = set],[
   NDPI_CFLAGS="${NDPI_CFLAGS} -O0 -g3"
 ],[
-  NDPI_CFLAGS="${NDPI_CFLAGS} -O2"
+  dnl>  Oss-fuzz doesn't really like any optimizaton flags don't set by itself
+  AS_IF([test "x$enable_fuzztargets" != "xyes"], [NDPI_CFLAGS="${NDPI_CFLAGS} -O2"])
 ])
 AS_IF([test "${with_sanitizer+set}" = set -o "${with_thread_sanitizer+set}" = set -o "${with_memory_sanitizer+set}" = set],[
   AS_IF([test "x$enable_gprof" = "xyes"], [
@@ -51,8 +66,14 @@ AS_IF([test "${with_sanitizer+set}" = set -o "${with_thread_sanitizer+set}" = se
 ])
 
 AS_IF([test "${with_sanitizer+set}" = set],[
-  NDPI_CFLAGS="${NDPI_CFLAGS} -fsanitize=address -fsanitize=undefined -fno-sanitize=alignment -fsanitize=leak -fno-omit-frame-pointer"
-  NDPI_LDFLAGS="${NDPI_LDFLAGS} -fsanitize=address -fsanitize=undefined -fno-sanitize=alignment -fsanitize=leak"
+  NDPI_CFLAGS="${NDPI_CFLAGS} -fsanitize=address -fsanitize=undefined -fsanitize=leak -fno-omit-frame-pointer"
+  NDPI_LDFLAGS="${NDPI_LDFLAGS} -fsanitize=address -fsanitize=undefined -fsanitize=leak"
+  #Sanitizers should work on any compilers that we support (or that we test on CI, at least)
+  #Exception: "-fsanitize=alignment" is not supported in gcc 4.9
+  AX_CHECK_COMPILE_FLAG([-fno-sanitize=alignment], [
+    NDPI_CFLAGS="${NDPI_CFLAGS} -fno-sanitize=alignment"
+    NDPI_LDFLAGS="${NDPI_LDFLAGS} -fno-sanitize=alignment"
+  ])
 ])
 
 AS_IF([test "${with_thread_sanitizer+set}" = set],[
@@ -61,8 +82,16 @@ AS_IF([test "${with_thread_sanitizer+set}" = set],[
 ])
 
 AS_IF([test "${with_memory_sanitizer+set}" = set],[
-  NDPI_CFLAGS="${NDPI_CFLAGS} -fsanitize=memory -fsanitize-memory-track-origins -fno-omit-frame-pointer"
+  NDPI_CFLAGS="${NDPI_CFLAGS} -fsanitize=memory -fno-omit-frame-pointer"
+  AS_IF([test "x$enable_memory_track_origins" != "xno"], [
+    NDPI_CFLAGS="${NDPI_CFLAGS} -fsanitize-memory-track-origins"
+  ])
   NDPI_LDFLAGS="${NDPI_LDFLAGS} -fsanitize=memory"
+])
+
+AS_IF([test "${with_macos_memory_sanitizer+set}" = set],[
+  NDPI_CFLAGS="${NDPI_CFLAGS} -fsanitize=address -fno-omit-frame-pointer -fsanitize=signed-integer-overflow -fno-sanitize-recover=address"
+  NDPI_LDFLAGS="${NDPI_LDFLAGS} -fsanitize=address"
 ])
 
 AS_IF([test "x${enable_code_coverage}" = "xyes"],[
@@ -77,6 +106,8 @@ LT_LIB_M
 PKG_PROG_PKG_CONFIG
 
 AC_PROG_CC
+AC_PROG_CPP_WERROR
+AC_C_INLINE
 
 SYSTEM=`uname -s`
 if test $SYSTEM = "Darwin"; then
@@ -93,6 +124,29 @@ AC_CHECK_TOOL(AR, ar, [false])
 
 AC_LANG_WERROR
 
+AC_MSG_CHECKING([whether roaring v3 works])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+	    #if __has_include (<stdio.h>)
+	    #endif
+	    ]])],
+	    [
+	      AC_MSG_RESULT([yes])
+	      ],
+	      [
+	        AC_MSG_RESULT([no])
+		  AC_DEFINE_UNQUOTED(USE_ROARING_V2, "1", [Use CRoaring 2.1.x])
+  ])
+
+GCC_VERSION=`gcc --version | cut -d ' ' -f 3 | head -1|cut -d '.' -f 1`
+if test "${GCC_VERSION}" == "version" ; then
+  GCC_VERSION=`gcc --version | cut -d ' ' -f 4 | head -1|cut -d '.' -f 1`
+fi
+
+if test "${GCC_VERSION}" -lt "7" ; then
+ AC_DEFINE_UNQUOTED(USE_ROARING_V2, "1", [Use CRoaring 2.1.x])
+fi
+
+
 NDPI_MAJOR=`echo "${PACKAGE_VERSION}" | cut -d . -f 1`
 NDPI_MINOR=`echo "${PACKAGE_VERSION}" | cut -d . -f 2`
 NDPI_PATCH=`echo "${PACKAGE_VERSION}" | cut -d . -f 3`
@@ -105,8 +159,8 @@ AC_DEFINE_UNQUOTED(NDPI_PATCH_LEVEL,   "${NDPI_PATCH}", [nDPI patch level])
 # .git as directory in a cloned repo
 # .git as file in submodule based integration
 if test -d ".git" || test -r ".git"; then
-     GIT_TAG=`git log -1 --format=%h`
-     GIT_DATE=`git log -1 --format=%cd`
+     GIT_TAG=`git log -1 --abbrev=7 --format=%h`
+     GIT_DATE=`git log -1 --abbrev=7 --format=%cd`
      #
      # On CentOS 6 `git rev-list HEAD --count` does not work
      #
@@ -136,6 +190,26 @@ echo "Setting API version to ${NDPI_API_VERSION}"
 AC_DEFINE_UNQUOTED(NDPI_GIT_RELEASE, "${GIT_RELEASE}", [GIT Release])
 AC_DEFINE_UNQUOTED(NDPI_GIT_DATE, "${GIT_DATE}", [Last GIT change])
 
+NDPI_CFLAGS="-W -Wall -Wno-address-of-packed-member ${NDPI_CFLAGS}"
+
+dnl> MacOS brew.sh
+HOMEBREW_DIR=/opt/homebrew
+if test -d $HOMEBREW_DIR; then
+ # On latest macOS versions on M* archs, some (all?) libraries are not installed
+ # "system-wide" anymore.
+ NDPI_CFLAGS="${NDPI_CFLAGS} -I ${HOMEBREW_DIR}/include"
+ NDPI_LDFLAGS="${NDPI_LDFLAGS} -L ${HOMEBREW_DIR}/lib"
+
+ # While updating NDPI_CFLAGS/NDPI_LDFLAGS is obvious, we need to update
+ # CFLAGS/LDFLAGS as well, because only these variables are used internally by
+ # autoconf to check for libraries.
+ # The core reason is likely that internally in our Makefiles we use
+ # NDPI_CFLAGS/NDPI_LDFLAGS instead of the standard CFLAGS/LDFLAGS
+ # See: 7c19de49047a5731f3107ff17854e9afe839cc61 for details
+ CFLAGS="${CFLAGS} -I ${HOMEBREW_DIR}/include"
+ LDFLAGS="${LDFLAGS} -L ${HOMEBREW_DIR}/lib"
+fi
+
 if ! test "${with_only_libndpi+set}" = set; then :
     dnl> used by json-c for unit tests
     PKG_CHECK_MODULES([JSONC], [json-c], [
@@ -151,12 +225,19 @@ if ! test "${with_only_libndpi+set}" = set; then :
         JSONC_LIBS=""
         JSONC_CFLAGS=""
     ])
-    AX_PTHREAD([],[
-        AC_MSG_WARN([POSIX Threads not available. Building library only.])
-        JSONC_LIBS=""
-        JSONC_CFLAGS=""
-        EXTRA_TARGETS=""
-    ])
+    dnl> AX_PTHREAD test does not work along with MingW/MSYS anymore
+    case "$host" in
+      *-*-mingw32*|*-*-msys)
+      ;;
+      *)
+        AX_PTHREAD([],[
+            AC_MSG_WARN([POSIX Threads not available. Building library only.])
+            JSONC_LIBS=""
+            JSONC_CFLAGS=""
+            EXTRA_TARGETS=""
+        ])
+      ;;
+    esac
 fi
 AM_CONDITIONAL([BUILD_UNITTESTS], [test "x$build_unittests" = "xyes"])
 
@@ -165,7 +246,10 @@ AS_IF([test "x${enable_tls_sigs}" = "xyes"],[
   HANDLE_TLS_SIGS=""
 ])
 
-NDPI_CFLAGS="-W -Wall -Wno-unused-parameter -Wno-unused-function -Wno-address-of-packed-member ${NDPI_CFLAGS}"
+AS_IF([test "${with_lto_and_gold_linker+set}" = set], [
+       NDPI_CFLAGS="${NDPI_CFLAGS} -flto -fuse-ld=gold -Wno-unused-command-line-argument"
+       NDPI_LDFLAGS="${NDPI_LDFLAGS} ${NDPI_CFLAGS}"
+])
 
 AC_CHECK_HEADERS([netinet/in.h stdint.h stdlib.h string.h unistd.h math.h float.h])
 AC_CHECK_LIB([m], [sqrt], [], [LIBM="-lm"])
@@ -175,6 +259,13 @@ if test "x$ac_cv_lib_rrd_rrd_fetch_r" = xyes; then :
    AC_DEFINE_UNQUOTED(HAVE_RRDTOOL, "1", [rrdtool is present])
    EXTRA_TARGETS="$EXTRA_TARGETS rrdtool"
 fi
+
+GLOBAL_CONTEXT_ENABLED=0
+AS_IF([test "x$enable_global_context_support" != "xno"], [
+  AC_CHECK_LIB([pthread], [pthread_mutex_init])
+  NDPI_CFLAGS="${NDPI_CFLAGS} -DUSE_GLOBAL_CONTEXT"
+  GLOBAL_CONTEXT_ENABLED=1
+])
 
 ADDITIONAL_INCS=
 ADDITIONAL_LIBS="$LIBM"
@@ -332,19 +423,19 @@ AS_IF([test "${with_local_libgcrypt+set}" = set],[
   AC_DEFINE_UNQUOTED(USE_HOST_LIBGCRYPT, 1, [Use locally installed libgcrypt instead of builtin gcrypt-light])
 ])
 
-dnl> PCRE
-PCRE_ENABLED=0
-AC_ARG_WITH(pcre,          [  --with-pcre        Enable nDPI build with libpcre])
-if test "${with_pcre+set}" = set; then :
-  AC_CHECK_LIB(pcre, pcre_compile, AC_DEFINE_UNQUOTED(HAVE_PCRE, 1, [libpcre(-dev) is present]))
-  if test "x$ac_cv_lib_pcre_pcre_compile" = xyes; then :
-    ADDITIONAL_LIBS="${ADDITIONAL_LIBS} -lpcre"
-    PCRE_ENABLED=1
+dnl> PCRE2
+PCRE2_ENABLED=0
+AC_ARG_WITH(pcre2, AS_HELP_STRING([--with-pcre2], [Enable nDPI build with libpcre2]))
+if test "${with_pcre2+set}" = set; then :
+  AC_CHECK_LIB(pcre2-8, pcre2_compile_8, AC_DEFINE_UNQUOTED(HAVE_PCRE2, 1, [libpcre2(-dev) is present]))
+  if test "x$ac_cv_lib_pcre2_8_pcre2_compile_8" = xyes; then :
+    ADDITIONAL_LIBS="${ADDITIONAL_LIBS} -lpcre2-8"
+    PCRE2_ENABLED=1
   fi
 fi
 
 dnl> GeoIP
-AC_ARG_WITH(maxminddb,          [  --with-maxminddb        Enable nDPI build with libmaxminddb])
+AC_ARG_WITH(maxminddb, AS_HELP_STRING([--with-maxminddb], [Enable nDPI build with libmaxminddb]))
 if test "${with_maxminddb+set}" = set; then :
   AC_CHECK_LIB([maxminddb], [MMDB_lookup_sockaddr])
   AC_CHECK_HEADERS([maxminddb.h])
@@ -353,6 +444,8 @@ if test "${with_maxminddb+set}" = set; then :
     AC_DEFINE_UNQUOTED(HAVE_MAXMINDDB, 1, [MaxMind DB support])
   fi
 fi
+
+AC_DEFINE_UNQUOTED(NDPI_BASE_DIR, "${PWD}", [nDPI base directory])
 
 dnl> Curl
 dnl> AC_CHECK_LIB([curl], [curl_easy_perform])
@@ -391,11 +484,13 @@ AC_SUBST(GPROF_CFLAGS)
 AC_SUBST(GPROF_LIBS)
 AC_SUBST(GPROF_ENABLED)
 AC_SUBST(USE_HOST_LIBGCRYPT)
-AC_SUBST(PCRE_ENABLED)
+AC_SUBST(PCRE2_ENABLED)
 AC_SUBST(NBPF_ENABLED)
+AC_SUBST(GLOBAL_CONTEXT_ENABLED)
 AC_SUBST(HANDLE_TLS_SIGS)
 AC_SUBST(DISABLE_NPCAP)
 AC_SUBST(EXE_SUFFIX)
 AC_SUBST(NDPI_CFLAGS)
 AC_SUBST(NDPI_LDFLAGS)
+AC_SUBST(NDPI_BASE_DIR)
 AC_OUTPUT

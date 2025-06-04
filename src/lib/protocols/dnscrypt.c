@@ -23,6 +23,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_DNSCRYPT
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static void ndpi_int_dnscrypt_add_connection(struct ndpi_detection_module_struct *ndpi_struct,
                                              struct ndpi_flow_struct *flow)
@@ -30,8 +31,8 @@ static void ndpi_int_dnscrypt_add_connection(struct ndpi_detection_module_struct
   ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_DNSCRYPT, NDPI_PROTOCOL_UNKNOWN, NDPI_CONFIDENCE_DPI);
 }
 
-void ndpi_search_dnscrypt(struct ndpi_detection_module_struct *ndpi_struct,
-                          struct ndpi_flow_struct *flow)
+static void ndpi_search_dnscrypt(struct ndpi_detection_module_struct *ndpi_struct,
+                                 struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   static char const * const dnscrypt_initial = "2\rdnscrypt";
@@ -45,6 +46,7 @@ void ndpi_search_dnscrypt(struct ndpi_detection_module_struct *ndpi_struct,
     ndpi_int_dnscrypt_add_connection(ndpi_struct, flow);
     return;
   }
+  
   /* dnscrypt protocol version 1 and 2: resolver ping */
   if (packet->payload_packet_len > 13 + strlen(dnscrypt_initial) &&
       strncasecmp((char*)packet->payload + 13, dnscrypt_initial, strlen(dnscrypt_initial)) == 0)
@@ -55,24 +57,21 @@ void ndpi_search_dnscrypt(struct ndpi_detection_module_struct *ndpi_struct,
 
   if ((flow->packet_direction_counter[packet->packet_direction] >= 1 &&
        flow->packet_direction_counter[1 - packet->packet_direction] >= 1) ||
-      flow->packet_counter >= 10)
-  {
+      flow->packet_counter >= 8) {
     /*
-     * Wait for at least one packet per direction, but not more then 10 packets.
+     * Wait for at least one packet per direction, up to a max
      * Required as we need to wait for the server response which contains the ASCII pattern below.
      */
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 }
 
-void init_dnscrypt_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id,
-                             NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_dnscrypt_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection(
-    "DNScrypt", ndpi_struct, detection_bitmask, *id,
-    NDPI_PROTOCOL_DNSCRYPT, ndpi_search_dnscrypt, NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-    SAVE_DETECTION_BITMASK_AS_UNKNOWN, ADD_TO_DETECTION_BITMASK);
-  *id += 1;
+  register_dissector("DNScrypt", ndpi_struct,
+                     ndpi_search_dnscrypt,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_DNSCRYPT);
 }
 

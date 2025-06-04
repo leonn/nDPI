@@ -26,6 +26,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_AMAZON_VIDEO
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static void ndpi_check_amazon_video(struct ndpi_detection_module_struct *ndpi_struct,
 				    struct ndpi_flow_struct *flow) {
@@ -53,26 +54,20 @@ static void ndpi_check_amazon_video(struct ndpi_detection_module_struct *ndpi_st
     }
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
-void ndpi_search_amazon_video(struct ndpi_detection_module_struct *ndpi_struct,
+static void ndpi_search_amazon_video(struct ndpi_detection_module_struct *ndpi_struct,
 			      struct ndpi_flow_struct *flow) {
   NDPI_LOG_DBG(ndpi_struct, "search amazon_video\n");
 
-  /* skip marked packets */
-  if(flow->detected_protocol_stack[0] != NDPI_PROTOCOL_AMAZON_VIDEO)
-    ndpi_check_amazon_video(ndpi_struct, flow);
+  ndpi_check_amazon_video(ndpi_struct, flow);
 }
 
 
-void init_amazon_video_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-				 u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask) {
-  ndpi_set_bitmask_protocol_detection("AMAZON_VIDEO", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_AMAZON_VIDEO,
-				      ndpi_search_amazon_video,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-  *id += 1;
+void init_amazon_video_dissector(struct ndpi_detection_module_struct *ndpi_struct) {
+  register_dissector("AMAZON_VIDEO", ndpi_struct,
+                     ndpi_search_amazon_video,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_OR_UDP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_AMAZON_VIDEO);
 }

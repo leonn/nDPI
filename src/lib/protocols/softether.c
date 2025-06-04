@@ -1,7 +1,7 @@
 /*
  * softether.c
  *
- * Copyright (C) 2022 - ntop.org
+ * Copyright (C) 2022-23 - ntop.org
  *
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -24,6 +24,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_SOFTETHER
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 enum softether_value_type {
   VALUE_INT    = 0u,
@@ -177,9 +178,10 @@ static int dissect_softether_host_fqdn(struct ndpi_flow_struct *flow,
   u_int8_t const *payload = packet->payload;
   u_int16_t payload_len = packet->payload_packet_len;
   u_int32_t tuple_count;
-  size_t value_siz;
+  size_t value_siz, hostname_len, fqdn_len;
   struct softether_value val1, val2;
   uint8_t got_hostname = 0, got_fqdn = 0;
+  const char *hostname_ptr = NULL, *fqdn_ptr = NULL;
 
   if(payload_len < 4)
     return 1;
@@ -208,20 +210,16 @@ static int dissect_softether_host_fqdn(struct ndpi_flow_struct *flow,
 
     if(got_hostname == 1) {
       if(val1.type == VALUE_STR && val1.value_size > 0) {
-	size_t len = ndpi_min(val1.value_size, sizeof(flow->protos.softether.hostname) - 1);
-	      
-	strncpy(flow->protos.softether.hostname, val1.value.ptr.value_str, len);
-	flow->protos.softether.hostname[len] = '\0';
+	hostname_len = ndpi_min(val1.value_size, sizeof(flow->protos.softether.hostname) - 1);
+	hostname_ptr = val1.value.ptr.value_str;
       }
 	  
       got_hostname = 0;
     }
     if(got_fqdn == 1) {
       if(val1.type == VALUE_STR && val1.value_size > 0)  {
-	size_t len = ndpi_min(val1.value_size, sizeof(flow->protos.softether.fqdn) - 1);
-	      
-	strncpy(flow->protos.softether.fqdn, val1.value.ptr.value_str, len);
-	flow->protos.softether.fqdn[len] = '\0';
+	fqdn_len = ndpi_min(val1.value_size, sizeof(flow->protos.softether.fqdn) - 1);
+	fqdn_ptr = val1.value.ptr.value_str;
       }
 	  
       got_fqdn = 0;
@@ -239,6 +237,15 @@ static int dissect_softether_host_fqdn(struct ndpi_flow_struct *flow,
   if(payload_len != 0 || tuple_count != 0)
     return 1;
 
+  /* Ok, write to `flow->protos.softether` */
+  if(hostname_ptr) {
+    strncpy(flow->protos.softether.hostname, hostname_ptr, hostname_len);
+    flow->protos.softether.hostname[hostname_len] = '\0';
+  }
+  if(fqdn_ptr) {
+    strncpy(flow->protos.softether.fqdn, fqdn_ptr, fqdn_len);
+    flow->protos.softether.fqdn[fqdn_len] = '\0';
+  }
   return 0;
 }
 
@@ -288,8 +295,8 @@ static int dissect_softether_ip_port(struct ndpi_flow_struct *flow,
 
 /* ***************************************************** */
 
-void ndpi_search_softether(struct ndpi_detection_module_struct *ndpi_struct,
-                           struct ndpi_flow_struct *flow) {
+static void ndpi_search_softether(struct ndpi_detection_module_struct *ndpi_struct,
+                                  struct ndpi_flow_struct *flow) {
   struct ndpi_packet_struct const * const packet = &ndpi_struct->packet;
 
   NDPI_LOG_DBG(ndpi_struct, "search softether\n");
@@ -297,7 +304,7 @@ void ndpi_search_softether(struct ndpi_detection_module_struct *ndpi_struct,
   if(packet->payload_packet_len == 1) {
 
     if((packet->payload[0] != 0x41) || (flow->packet_counter > 2))	
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);	
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);	
 
     return;
   }
@@ -308,7 +315,7 @@ void ndpi_search_softether(struct ndpi_detection_module_struct *ndpi_struct,
       return;
     }
   }
-    
+
   if(packet->payload_packet_len >= 99) {
     if(dissect_softether_host_fqdn(flow, packet) == 0) {
       ndpi_int_softether_add_connection(ndpi_struct, flow);
@@ -316,7 +323,7 @@ void ndpi_search_softether(struct ndpi_detection_module_struct *ndpi_struct,
     }
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 /* ***************************************************** */
@@ -340,15 +347,9 @@ static int ndpi_search_softether_again(struct ndpi_detection_module_struct *ndpi
 
 /* ***************************************************** */
   
-void init_softether_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-			      u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask) {
-  ndpi_set_bitmask_protocol_detection("Softether", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_SOFTETHER,
-				      ndpi_search_softether,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK
-				      );
-
-  *id += 1;
+void init_softether_dissector(struct ndpi_detection_module_struct *ndpi_struct) {
+  register_dissector("Softether", ndpi_struct,
+                     ndpi_search_softether,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_SOFTETHER);
 }

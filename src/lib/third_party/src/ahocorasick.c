@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#ifndef WIN32
+#if !defined(WIN32) && !defined(_MSC_VER)
 #include <unistd.h>
 #else
 #define __SIZEOF_LONG__ 4
@@ -42,6 +42,8 @@ typedef __kernel_size_t size_t;
 
 #include "ndpi_api.h"
 #include "ahocorasick.h"
+
+#include "../../../include/ndpi_replace_printf.h"
 
 /* TODO: For different depth of node, number of outgoing edges differs
    considerably, It is efficient to use different chunk size for 
@@ -223,9 +225,14 @@ void ac_automata_enable_debug (int debug) {
 AC_ERROR_t ac_automata_add (AC_AUTOMATA_t * thiz, AC_PATTERN_t * patt)
 {
   unsigned int i;
-  AC_NODE_t * n = thiz->root;
+  AC_NODE_t * n;
   AC_NODE_t * next;
   AC_ALPHABET_t alpha;
+
+  if(!thiz || !patt || !patt->astring)
+    return ACERR_ERROR;
+
+  n = thiz->root;
 
   if(!thiz->automata_open)
     return ACERR_AUTOMATA_CLOSED;
@@ -254,8 +261,19 @@ AC_ERROR_t ac_automata_add (AC_AUTOMATA_t * thiz, AC_PATTERN_t * patt)
   if(thiz->max_str_len < patt->length)
      thiz->max_str_len = patt->length;
 
-  if(n->final) {
+  if(n->final && n->matched_patterns) {
+    /*
+      In this case an existing pattern exists and thus we overwrite
+      the previous protocol value with this one
+    */
+
+#if 1
+    /* nDPI code */
+    n->matched_patterns->patterns[0].rep.number = patt->rep.number;
+#else
+    /* original code */
     patt->rep.number = n->matched_patterns->patterns[0].rep.number;
+#endif
     return ACERR_DUPLICATE_PATTERN;
   }
 
@@ -317,7 +335,7 @@ AC_ERROR_t ac_automata_walk(AC_AUTOMATA_t * thiz,
     }
 
     path[ip].idx = i+1;
-    if(ip >= AC_PATTRN_MAX_LENGTH)
+    if(ip > AC_PATTRN_MAX_LENGTH)
         continue;
 
     ip++;
@@ -367,7 +385,7 @@ static AC_ERROR_t ac_finalize_node(AC_AUTOMATA_t * thiz,AC_NODE_t * n, int idx, 
 AC_ERROR_t ac_automata_finalize (AC_AUTOMATA_t * thiz) {
 
     AC_ERROR_t r = ACERR_SUCCESS;
-    if(!thiz->automata_open) return r;
+    if(!thiz || !thiz->automata_open) return r;
 
     ac_automata_traverse_setfailure (thiz);
     thiz->id=0;
@@ -434,6 +452,8 @@ int ac_automata_search (AC_AUTOMATA_t * thiz,
   AC_NODE_t *next;
   AC_ALPHABET_t *apos;
 
+  if(!thiz || !txt) return -1;
+
   thiz->stats.n_search++;
 
   if(thiz->automata_open)
@@ -469,12 +489,13 @@ int ac_automata_search (AC_AUTOMATA_t * thiz,
       } else {
           curr = next;
           position++;
-          if(curr->final) {
+          if(curr->final && curr->matched_patterns) {
               /* select best match */
               match->match_map = ac_automata_exact_match(curr->matched_patterns,position,txt);
               if(match->match_map) {
                   match->match_counter++; /* we have a matching */
 #ifndef __KERNEL__
+#ifdef NDPI_ENABLE_DEBUG_MESSAGES
                   if(debug) {
                       int i;
                       AC_PATTERN_t *patterns = curr->matched_patterns->patterns;
@@ -487,6 +508,7 @@ int ac_automata_search (AC_AUTOMATA_t * thiz,
                               patterns[i].rep.number);
                       }
                   }
+#endif
 #endif
                   if(thiz->match_handler) {
                       /* We check 'next' to find out if we came here after a alphabet
@@ -514,6 +536,7 @@ int ac_automata_search (AC_AUTOMATA_t * thiz,
       if(txt->match.matched[i]) {
             *param = (txt->match.matched[i])->rep;
 #ifndef __KERNEL__
+#ifdef NDPI_ENABLE_DEBUG_MESSAGES
             if(debug) {
                 AC_PATTERN_t *pattern = txt->match.matched[i];
                 printf("best match: %c%.*s%c [%u]\n",
@@ -522,6 +545,7 @@ int ac_automata_search (AC_AUTOMATA_t * thiz,
                           pattern->rep.at_end ? '$':' ',
                           pattern->rep.number);
             }
+#endif
 #endif
             thiz->stats.n_found++;
             return 1;
@@ -555,6 +579,9 @@ static AC_ERROR_t ac_automata_release_node(AC_AUTOMATA_t * thiz,
     return ACERR_SUCCESS;
 }
 void ac_automata_release (AC_AUTOMATA_t * thiz, uint8_t free_pattern) {
+
+    if(!thiz)
+      return;
 
     ac_automata_walk(thiz,ac_automata_release_node,NULL,free_pattern ? (void *)1:NULL);
 
@@ -635,17 +662,25 @@ static AC_ERROR_t dump_node_common(AC_AUTOMATA_t * thiz,
     dump_node_header(n,ai);
     if (n->matched_patterns && n->matched_patterns->num && n->final) {
         char lbuf[512];
-        int nl = 0,j;
+        int nl = 0,j,ret;
 
         nl = ndpi_snprintf(lbuf,sizeof(lbuf),"'%.100s' N:%d{",rstr,n->matched_patterns->num);
         for (j=0; j<n->matched_patterns->num; j++) {
             AC_PATTERN_t *sid = &n->matched_patterns->patterns[j];
-            if(j) nl += ndpi_snprintf(&lbuf[nl],sizeof(lbuf)-nl-1,", ");
-            nl += ndpi_snprintf(&lbuf[nl],sizeof(lbuf)-nl-1,"%d %c%.100s%c",
+            if(j) {
+                ret = ndpi_snprintf(&lbuf[nl],sizeof(lbuf)-nl-1,", ");
+                if (ret < 0 || (unsigned int)ret >= sizeof(lbuf)-nl-1)
+                    break;
+                nl += (unsigned int)ret;
+            }
+            ret = ndpi_snprintf(&lbuf[nl],sizeof(lbuf)-nl-1,"%d %c%.100s%c",
                             sid->rep.number & 0x3fff,
                             sid->rep.number & 0x8000 ? '^':' ',
                             sid->astring,
                             sid->rep.number & 0x4000 ? '$':' ');
+            if (ret < 0 || (unsigned int)ret >= sizeof(lbuf)-nl-1)
+                break;
+            nl += (unsigned int)ret;
         }
         fprintf(ai->file,"%s}\n",lbuf);
       }
@@ -672,6 +707,8 @@ static void dump_node_str(AC_AUTOMATA_t * thiz, AC_NODE_t * node,
 void ac_automata_dump(AC_AUTOMATA_t * thiz, FILE *file) {
   struct aho_dump_info ai;
 
+  if(!thiz) return;
+
   memset((char *)&ai,0,sizeof(ai));
   ai.file = file ? file : stdout;
   fprintf(ai.file,"---DUMP- all nodes %u - max strlen %u -%s---\n",
@@ -692,6 +729,7 @@ void ac_automata_dump(AC_AUTOMATA_t * thiz, FILE *file) {
   fprintf(ai.file,"---\n mem size %zu avg node size %d, node one char %d, <=8c %d, >8c %d, range %d\n---DUMP-END-\n",
               ai.memcnt,(int)ai.memcnt/(thiz->all_nodes_num+1),(int)ai.node_oc,(int)ai.node_8c,(int)ai.node_xc,(int)ai.node_xr);
 #endif
+  acho_free(ai.bufstr);
 }
 #endif
 
@@ -1013,8 +1051,11 @@ static int node_register_matchstr (AC_NODE_t * thiz, AC_PATTERN_t * str,int is_e
   if (thiz->matched_patterns && node_has_matchstr(thiz, str))
     return 0;
 
-  if(!thiz->matched_patterns)
+  if(!thiz->matched_patterns) {
     thiz->matched_patterns = node_resize_mp(thiz->matched_patterns);
+    if(!thiz->matched_patterns)
+      return 1;
+  }
 
   /* Manage memory */
   if (thiz->matched_patterns->num >= thiz->matched_patterns->max) {

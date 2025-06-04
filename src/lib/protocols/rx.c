@@ -28,6 +28,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_RX
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 /* See http://web.mit.edu/kolya/afs/rx/rx-spec for protocol description. */
 
@@ -76,8 +77,8 @@ struct ndpi_rx_header {
 
 
 
-void ndpi_check_rx(struct ndpi_detection_module_struct *ndpi_struct,
-                   struct ndpi_flow_struct *flow)
+static void ndpi_check_rx(struct ndpi_detection_module_struct *ndpi_struct,
+                          struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   u_int32_t payload_len = packet->payload_packet_len;
@@ -87,7 +88,7 @@ void ndpi_check_rx(struct ndpi_detection_module_struct *ndpi_struct,
 
   /* Check that packet is long enough */
   if (payload_len < sizeof(struct ndpi_rx_header)) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
   
@@ -110,7 +111,7 @@ void ndpi_check_rx(struct ndpi_detection_module_struct *ndpi_struct,
   
   /* TYPE field */
   if((header->type < RX_DATA) || (header->type > RX_VERS)) {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -163,11 +164,11 @@ void ndpi_check_rx(struct ndpi_detection_module_struct *ndpi_struct,
       case RX_VERS:
 	goto security;
       default:
-	NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+	NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 	return;
     } // switch
   } else { // FLAG
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 
@@ -175,7 +176,7 @@ void ndpi_check_rx(struct ndpi_detection_module_struct *ndpi_struct,
   /* SECURITY field */
   if(header->security > 3)
   {
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
   
@@ -193,7 +194,7 @@ void ndpi_check_rx(struct ndpi_detection_module_struct *ndpi_struct,
     /* https://www.central.org/frameless/numbers/rxservice.html. */
     else
     {
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       return;
     }
   } else {
@@ -202,8 +203,8 @@ void ndpi_check_rx(struct ndpi_detection_module_struct *ndpi_struct,
   }
 }
 
-void ndpi_search_rx(struct ndpi_detection_module_struct *ndpi_struct,
-                    struct ndpi_flow_struct *flow)
+static void ndpi_search_rx(struct ndpi_detection_module_struct *ndpi_struct,
+                           struct ndpi_flow_struct *flow)
 {
   NDPI_LOG_DBG(ndpi_struct, "search RX\n");
   if (flow->detected_protocol_stack[0] != NDPI_PROTOCOL_RX) {
@@ -211,17 +212,11 @@ void ndpi_search_rx(struct ndpi_detection_module_struct *ndpi_struct,
   }
 }
 
-void init_rx_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-                       u_int32_t *id,
-                       NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_rx_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("RX", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_RX,
-				      ndpi_search_rx,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("RX", ndpi_struct,
+                     ndpi_search_rx,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_RX);
 }
 

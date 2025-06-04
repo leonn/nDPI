@@ -26,13 +26,11 @@
 #include <string.h>
 
 #include <stdio.h>
-
+#include <ndpi_api.h>
+#include <ndpi_main.h>
+#include "ndpi_typedefs.h"
 #include "../include/MurmurHash3.h"
 #include "../include/hll.h"
-
-u_int32_t _hll_hash(const struct ndpi_hll *hll) {
-  return MurmurHash3_x86_32(hll->registers, (u_int32_t)hll->size, 0);
-}
 
 /* Count the number of leading zero's */
 static __inline u_int8_t _hll_rank(u_int32_t hash, u_int8_t bits) {
@@ -71,6 +69,13 @@ static __inline u_int8_t _hll_rank(u_int32_t hash, u_int8_t bits) {
   [i: 19] 524288 bytes [StdError: 0.14%]
 */
 int hll_init(struct ndpi_hll *hll, u_int8_t bits) {
+  if(!hll) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  memset(hll, '\0', sizeof(*hll));
+
   if(bits < 4 || bits > 20) {
     errno = ERANGE;
     return -1;
@@ -114,7 +119,7 @@ static __inline int _hll_add_hash(struct ndpi_hll *hll, u_int32_t hash) {
 
 /* Return: 0 = nothing changed, 1 = ranking changed */
 int hll_add(struct ndpi_hll *hll, const void *buf, size_t size) {
-  u_int32_t hash = MurmurHash3_x86_32((const char *)buf, (u_int32_t)size, 0x5f61767a);
+  u_int32_t hash = MurmurHash((const char *)buf, (u_int32_t)size, 0x5f61767a);
 
   return(_hll_add_hash(hll, hash));
 }

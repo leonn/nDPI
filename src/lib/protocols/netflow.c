@@ -1,7 +1,7 @@
 /*
  * netflow.c
  *
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  *
  * nDPI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -23,6 +23,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_NETFLOW
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 
 #ifdef WIN32
@@ -97,7 +98,7 @@ struct flow_ver7_rec {
   u_int32_t router_sc;  /* Router which is shortcut by switch */
 };
 
-void ndpi_search_netflow(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_netflow(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
   // const u_int8_t *packet_payload = packet->payload;
@@ -118,7 +119,7 @@ void ndpi_search_netflow(struct ndpi_detection_module_struct *ndpi_struct, struc
     case 7:
     case 9:
       if((n == 0) || (n > 30)) {
-	NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+	NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 	return;
       }
       
@@ -141,7 +142,7 @@ void ndpi_search_netflow(struct ndpi_detection_module_struct *ndpi_struct, struc
       }
 
       if((expected_len > 0) && (expected_len != payload_len)) {
-	NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+	NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 	return;
       }
 
@@ -153,7 +154,7 @@ void ndpi_search_netflow(struct ndpi_detection_module_struct *ndpi_struct, struc
 	u_int16_t ipfix_len = n;
 
 	if(ipfix_len != payload_len) {
-	  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+	  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 	  return;
 	}
       }    
@@ -161,7 +162,7 @@ void ndpi_search_netflow(struct ndpi_detection_module_struct *ndpi_struct, struc
       break;
       
     default:
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       return;
     }
 
@@ -178,18 +179,14 @@ void ndpi_search_netflow(struct ndpi_detection_module_struct *ndpi_struct, struc
       return;
     }
   } else
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
-void init_netflow_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_netflow_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("NetFlow", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_NETFLOW,
-				      ndpi_search_netflow,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("NetFlow", ndpi_struct,
+                     ndpi_search_netflow,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_NETFLOW);
 }
 

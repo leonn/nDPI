@@ -2,7 +2,7 @@
  * iax.c
  *
  * Copyright (C) 2009-11 - ipoque GmbH
- * Copyright (C) 2011-22 - ntop.org
+ * Copyright (C) 2011-25 - ntop.org
  *
  * This file is part of nDPI, an open source deep packet inspection
  * library based on the OpenDPI and PACE technology by ipoque GmbH
@@ -28,6 +28,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_IAX
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 
 #define NDPI_IAX_MAX_INFORMATION_ELEMENTS 15
@@ -81,11 +82,11 @@ static void ndpi_search_setup_iax(struct ndpi_detection_module_struct *ndpi_stru
 
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 
 }
 
-void ndpi_search_iax(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_iax(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
@@ -95,14 +96,10 @@ void ndpi_search_iax(struct ndpi_detection_module_struct *ndpi_struct, struct nd
 }
 
 
-void init_iax_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_iax_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("IAX", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_IAX,
-				      ndpi_search_iax,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("IAX", ndpi_struct,
+                     ndpi_search_iax,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_UDP_WITH_PAYLOAD,
+                     1, NDPI_PROTOCOL_IAX);
 }

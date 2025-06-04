@@ -23,9 +23,10 @@
 #include "ndpi_protocol_ids.h"
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_SMBV23
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 
-void ndpi_search_smb_tcp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_smb_tcp(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
@@ -51,7 +52,19 @@ void ndpi_search_smb_tcp(struct ndpi_detection_module_struct *ndpi_struct, struc
           if(packet->payload[8] != 0x72) /* Skip Negotiate request */ {
             NDPI_LOG_INFO(ndpi_struct, "found SMBv1\n");
             ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_SMBV1, NDPI_PROTOCOL_NETBIOS, NDPI_CONFIDENCE_DPI);
-            ndpi_set_risk(ndpi_struct, flow, NDPI_SMB_INSECURE_VERSION, "Found SMBv1");
+
+	    /*
+	      Before we complain let's check if this is a broadacast message
+	      as for broadcast we can tolerate v1 as it can be used to
+	      discover old device versions.
+
+	      As nDPI has not MAC address visibility (checking for destination MAC
+	      FF:FF:FF:FF:FF:FF would have been easier) we need to implement
+	      some heuristic here.
+	    */
+
+	    if(packet->payload[8] != 0x25) /* Skip SMB command Trans */
+	      ndpi_set_risk(ndpi_struct, flow, NDPI_SMB_INSECURE_VERSION, "Found SMBv1");
           }
           return;
         } else if(memcmp(&packet->payload[4], smbv2, sizeof(smbv2)) == 0) {
@@ -63,19 +76,14 @@ void ndpi_search_smb_tcp(struct ndpi_detection_module_struct *ndpi_struct, struc
     }
   }
 
-  NDPI_EXCLUDE_PROTO_EXT(ndpi_struct, flow, NDPI_PROTOCOL_SMBV1);
-  NDPI_EXCLUDE_PROTO_EXT(ndpi_struct, flow, NDPI_PROTOCOL_SMBV23);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 
-void init_smb_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_smb_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("SMB", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_SMBV23,
-				      ndpi_search_smb_tcp,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("SMB", ndpi_struct,
+                     ndpi_search_smb_tcp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_SMBV23);
 }

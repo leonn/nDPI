@@ -22,6 +22,7 @@
 #include "ndpi_protocol_ids.h"
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_NATS
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 static const char* commands[] =
   {
@@ -37,15 +38,18 @@ static const char* commands[] =
    NULL
   };
 
-void ndpi_search_nats_tcp(struct ndpi_detection_module_struct *ndpi_struct,
-                            struct ndpi_flow_struct *flow) {
+static void ndpi_search_nats_tcp(struct ndpi_detection_module_struct *ndpi_struct,
+                                 struct ndpi_flow_struct *flow) {
   struct ndpi_packet_struct *packet = &ndpi_struct->packet;
 
   /* Check connection over TCP */
   NDPI_LOG_DBG(ndpi_struct, "search NATS\n");
 
-  if(packet->tcp && (packet->payload_packet_len > 4)) {
+  if(packet->tcp) {
     int i;
+
+    if(packet->payload_packet_len <= 4)
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 
     for(i=0; commands[i] != NULL; i++) {
       int len = ndpi_min(strlen(commands[i]), packet->payload_packet_len);
@@ -63,19 +67,15 @@ void ndpi_search_nats_tcp(struct ndpi_detection_module_struct *ndpi_struct,
       }
     }
 
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
   }
 }
 
 
 
-void init_nats_dissector(struct ndpi_detection_module_struct *ndpi_struct,
-			 u_int32_t *id, NDPI_PROTOCOL_BITMASK *detection_bitmask) {
-  ndpi_set_bitmask_protocol_detection("Nats", ndpi_struct, detection_bitmask, *id,
-				      NDPI_PROTOCOL_NATS,
-				      ndpi_search_nats_tcp,
-				      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-				      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-				      ADD_TO_DETECTION_BITMASK);
-  *id += 1;
+void init_nats_dissector(struct ndpi_detection_module_struct *ndpi_struct) {
+  register_dissector("Nats", ndpi_struct,
+                     ndpi_search_nats_tcp,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_NATS);
 }

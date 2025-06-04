@@ -25,6 +25,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_WEBSOCKET
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 enum websocket_opcode
   {
@@ -62,7 +63,7 @@ static void ndpi_check_websocket(struct ndpi_detection_module_struct *ndpi_struc
 
   if (packet->payload_packet_len < sizeof(u_int16_t))
     {
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       return;
     }
 
@@ -74,7 +75,7 @@ static void ndpi_check_websocket(struct ndpi_detection_module_struct *ndpi_struc
   if (packet->payload_packet_len != hdr_size + websocket_payload_length)
     {
       NDPI_LOG_DBG(ndpi_struct, "Invalid WEBSOCKET payload");
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       return;
     }
 
@@ -88,39 +89,64 @@ static void ndpi_check_websocket(struct ndpi_detection_module_struct *ndpi_struc
 
   } else {
     NDPI_LOG_DBG(ndpi_struct, "Invalid WEBSOCKET payload");
-    NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+    NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
     return;
   }
 }
 
-void ndpi_search_websocket(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+static void ndpi_search_websocket(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
 {
   // Break after 6 packets.
   if (flow->packet_counter > 10)
     {
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
-      return;
-    }
-
-  if (flow->detected_protocol_stack[0] != NDPI_PROTOCOL_UNKNOWN)
-    {
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       return;
     }
 
   NDPI_LOG_DBG(ndpi_struct, "search WEBSOCKET\n");
   ndpi_check_websocket(ndpi_struct, flow);
 
+  // Check also some HTTP headers indicating an upcoming WebSocket connection
+  if (flow->detected_protocol_stack[0] == NDPI_PROTOCOL_HTTP &&
+      flow->detected_protocol_stack[1] != NDPI_PROTOCOL_WEBSOCKET)
+  {
+    struct ndpi_packet_struct const * const packet = &ndpi_struct->packet;
+    uint16_t i;
+
+    NDPI_PARSE_PACKET_LINE_INFO(ndpi_struct, flow, packet);
+    for (i = 0; i < packet->parsed_lines; i++) {
+      if (LINE_STARTS(packet->line[i], "upgrade:") != 0 &&
+          LINE_ENDS(packet->line[i], "websocket") != 0)
+      {
+        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_WEBSOCKET,
+                                   NDPI_PROTOCOL_HTTP, NDPI_CONFIDENCE_DPI);
+      } else if (LINE_STARTS(packet->line[i], "sec-websocket") != 0) {
+        ndpi_set_detected_protocol(ndpi_struct, flow, NDPI_PROTOCOL_WEBSOCKET,
+                                   NDPI_PROTOCOL_HTTP, NDPI_CONFIDENCE_DPI);
+        if (ndpi_strncasestr((const char *)packet->line[i].ptr, "chisel",
+                             packet->line[i].len) != NULL)
+        {
+          ndpi_set_risk(ndpi_struct, flow, NDPI_OBFUSCATED_TRAFFIC,
+                        "Obfuscated SSH-in-HTTP-WebSocket traffic");
+        }
+      }
+    }
+    if (i == packet->parsed_lines)
+    {
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
+      return;
+    }
+  }
+
   return;
 }
 
 /* ********************************* */
 
-void init_websocket_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id,
-                              NDPI_PROTOCOL_BITMASK *detection_bitmask)
+void init_websocket_dissector(struct ndpi_detection_module_struct *ndpi_struct)
 {
-  ndpi_set_bitmask_protocol_detection("WEBSOCKET", ndpi_struct, detection_bitmask, *id, NDPI_PROTOCOL_WEBSOCKET,
-                                     ndpi_search_websocket, NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-                                     SAVE_DETECTION_BITMASK_AS_UNKNOWN, ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+  register_dissector("WEBSOCKET", ndpi_struct,
+                     ndpi_search_websocket,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_WEBSOCKET);
 }

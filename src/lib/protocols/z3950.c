@@ -23,6 +23,7 @@
 #define NDPI_CURRENT_PROTO NDPI_PROTOCOL_Z3950
 
 #include "ndpi_api.h"
+#include "ndpi_private.h"
 
 /* https://github.com/wireshark/wireshark/blob/master/epan/dissectors/asn1/z3950/z3950.asn */
 
@@ -34,18 +35,14 @@ static void ndpi_int_z3950_add_connection(struct ndpi_detection_module_struct *n
 /* ***************************************************************** */
 
 static int z3950_parse_sequences(struct ndpi_packet_struct const * const packet,
-				 struct ndpi_flow_struct *flow,
                                  int max_sequences) {
   size_t payload_offset = 2;
   int cur_sequences = 0;
   u_int8_t pdu_type;
 
-  if(packet->payload_packet_len < 2)
-    return(-1);  
-
   pdu_type = packet->payload[0] & 0x1F;
 
-  if(((pdu_type < 20) || (pdu_type > 36)) && ((pdu_type < 43) || (pdu_type > 48)))
+  if((pdu_type < 20) || ((pdu_type > 36) && ((pdu_type < 43) || (pdu_type > 48))))
     return(-1);  
 
   while(cur_sequences++ < max_sequences) {
@@ -94,10 +91,10 @@ static void ndpi_search_z3950(struct ndpi_detection_module_struct *ndpi_struct,
 
   if(packet->tcp != NULL && packet->payload_packet_len >= 6 &&
      flow->packet_counter >= 1 && flow->packet_counter <= 8) {
-    int ret = z3950_parse_sequences(packet, flow, minimum_expected_sequences);
+    int ret = z3950_parse_sequences(packet, minimum_expected_sequences);
 
     if(ret < 0) {
-      NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+      NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
       return;
     }
 
@@ -106,31 +103,25 @@ static void ndpi_search_z3950(struct ndpi_detection_module_struct *ndpi_struct,
       return;
     }
 
-    if(flow->z3950_stage == 3) {
+    if(flow->l4.tcp.z3950_stage == 3) {
       if(flow->packet_direction_counter[0] && flow->packet_direction_counter[1])
 	ndpi_int_z3950_add_connection(ndpi_struct, flow);
       else
-	NDPI_EXCLUDE_PROTO(ndpi_struct, flow);  /* Skip if unidirectional traffic */
+	NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);  /* Skip if unidirectional traffic */
     } else
-      flow->z3950_stage++;
+      flow->l4.tcp.z3950_stage++;
 
     return;
   }
 
-  NDPI_EXCLUDE_PROTO(ndpi_struct, flow);
+  NDPI_EXCLUDE_DISSECTOR(ndpi_struct, flow);
 }
 
 /* ***************************************************************** */
 
-void init_z3950_dissector(struct ndpi_detection_module_struct *ndpi_struct, u_int32_t *id,
-                          NDPI_PROTOCOL_BITMASK *detection_bitmask) {
-  ndpi_set_bitmask_protocol_detection("Z3950",
-                                      ndpi_struct, detection_bitmask, *id,
-                                      NDPI_PROTOCOL_Z3950,
-                                      ndpi_search_z3950,
-                                      NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
-                                      SAVE_DETECTION_BITMASK_AS_UNKNOWN,
-                                      ADD_TO_DETECTION_BITMASK);
-
-  *id += 1;
+void init_z3950_dissector(struct ndpi_detection_module_struct *ndpi_struct) {
+  register_dissector("Z3950", ndpi_struct,
+                     ndpi_search_z3950,
+                     NDPI_SELECTION_BITMASK_PROTOCOL_V4_V6_TCP_WITH_PAYLOAD_WITHOUT_RETRANSMISSION,
+                     1, NDPI_PROTOCOL_Z3950);
 }
