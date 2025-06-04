@@ -634,8 +634,17 @@ struct ndpi_vxlanhdr {
 #define NDPI_GRE_IS_VERSION_0(f) (((f) & NDPI_GRE_VERSION) == ntohs(0x0000))
 #define NDPI_GRE_IS_VERSION_1(f) (((f) & NDPI_GRE_VERSION) == ntohs(0x0001))
 
-#define NDPI_GRE_PROTO_PPP ntohs(0x880b)
-#define NDPI_PPP_HDRLEN	4	/* octets for standard ppp header */
+#define NDPI_GRE_PROTO_PPP        ntohs(0x880b)
+#define NDPI_PPP_HDRLEN           4       /* octets for standard ppp header */
+/* Other GRE protocol types */
+#define NDPI_GRE_PROTO_TEB        ntohs(0x6558) /* Transparent Ethernet Bridging */
+#define NDPI_GRE_PROTO_WCCP       ntohs(0x883E) /* Web Cache Coordination */
+#define NDPI_GRE_PROTO_LCC_SLL    ntohs(0x0003) /* Linux Cooked Capture */
+#define NDPI_LCC_SLL_HDRLEN       4
+/* ERSPAN over GRE */
+#define NDPI_GRE_PROTO_ERSPAN_I_II ntohs(0x88BE)
+#define NDPI_GRE_PROTO_ERSPAN_III ntohs(0x22EB)
+#define NDPI_ERSPAN_HDRLEN        8       /* bytes */
 
 /* +++++++++++++++++++++++ GRE basic header +++++++++++++++++++++++ */
 PACK_ON

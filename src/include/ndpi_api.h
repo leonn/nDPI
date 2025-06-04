@@ -2454,6 +2454,11 @@ extern "C" {
    * comparison.
    */
   int ndpi_memcasecmp(const void *s1, const void *s2, size_t n);
+/* Validate GRE tunnel and return payload offset, or 0 if invalid */
+uint32_t ndpi_is_valid_gre_tunnel(const void *header,
+                                  const uint8_t *packet,
+                                  uint16_t ip_offset,
+                                  uint16_t ip_len);
 
 #ifdef __cplusplus
 }
