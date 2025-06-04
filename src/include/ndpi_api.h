@@ -27,6 +27,7 @@
 
 #include "ndpi_main.h"
 
+#include <pcap/pcap.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -2454,6 +2455,11 @@ extern "C" {
    * comparison.
    */
   int ndpi_memcasecmp(const void *s1, const void *s2, size_t n);
+/* Validate GRE tunnel and return payload offset, or 0 if invalid */
+uint32_t ndpi_is_valid_gre_tunnel(const struct pcap_pkthdr *header,
+                                  const uint8_t *packet,
+                                  uint16_t ip_offset,
+                                  uint16_t ip_len);
 
 #ifdef __cplusplus
 }
