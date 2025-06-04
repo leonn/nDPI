@@ -2645,10 +2645,8 @@ struct ndpi_proto ndpi_workflow_process_packet(struct ndpi_workflow * workflow,
     if((offset = ndpi_is_valid_gre_tunnel(header, packet, ip_offset, ip_len))) {
       tunnel_type = ndpi_gre_tunnel;
       struct ndpi_gre_basehdr *grehdr = (struct ndpi_gre_basehdr*)&packet[ip_offset + ip_len];
-      if(grehdr->protocol == ntohs(ETH_P_IP) || grehdr->protocol == ntohs(ETH_P_IPV6)) {
-        ip_offset = offset;
-        goto iph_check;
-      } else if(grehdr->protocol == NDPI_GRE_PROTO_PPP) {  // ppp protocol
+      if(grehdr->protocol == ntohs(ETH_P_IP) || grehdr->protocol == ntohs(ETH_P_IPV6) ||
+         grehdr->protocol == NDPI_GRE_PROTO_PPP) {
         ip_offset = offset;
         goto iph_check;
       } else {
