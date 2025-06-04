@@ -1,6 +1,6 @@
 #include "ndpi_typedefs.h"
 #include "ndpi_api.h"
-#include <pcap/pcap.h>
+#include <pcap.h>
 
 /*
  * Validate and skip GRE headers, returning the offset
@@ -77,6 +77,10 @@ uint32_t ndpi_is_valid_gre_tunnel(const struct pcap_pkthdr *header,
     if(header->caplen < offset + NDPI_LCC_SLL_HDRLEN)
       return 0;
     offset += NDPI_LCC_SLL_HDRLEN;
+  } else if(grehdr->protocol == NDPI_GRE_PROTO_PPP) {
+    if(header->caplen < offset + NDPI_PPP_HDRLEN)
+      return 0;
+    offset += NDPI_PPP_HDRLEN;
   }
 
   return offset;

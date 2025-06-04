@@ -2649,7 +2649,7 @@ struct ndpi_proto ndpi_workflow_process_packet(struct ndpi_workflow * workflow,
         ip_offset = offset;
         goto iph_check;
       } else if(grehdr->protocol == NDPI_GRE_PROTO_PPP) {  // ppp protocol
-        ip_offset = offset + NDPI_PPP_HDRLEN;
+        ip_offset = offset;
         goto iph_check;
       } else {
         eth_offset = offset;

@@ -27,7 +27,7 @@
 
 #include "ndpi_main.h"
 
-#include <pcap/pcap.h>
+struct pcap_pkthdr;
 #ifdef __cplusplus
 extern "C" {
 #endif
