@@ -2169,6 +2169,17 @@ static uint32_t ndpi_is_valid_gre_tunnel(const struct pcap_pkthdr *header,
   } else { /*support only ver 0, 1*/
     return 0;
   }
+
+  if(grehdr->protocol == NDPI_GRE_PROTO_ERSPAN_I_II ||
+     grehdr->protocol == NDPI_GRE_PROTO_ERSPAN_III) {
+    if(header->caplen < offset + NDPI_ERSPAN_HDRLEN)
+      return 0;
+    offset += NDPI_ERSPAN_HDRLEN;
+  } else if(grehdr->protocol == NDPI_GRE_PROTO_LCC_SLL) {
+    if(header->caplen < offset + NDPI_LCC_SLL_HDRLEN)
+      return 0;
+    offset += NDPI_LCC_SLL_HDRLEN;
+  }
   return offset;
 }
 
@@ -2714,7 +2725,7 @@ struct ndpi_proto ndpi_workflow_process_packet(struct ndpi_workflow * workflow,
       if(grehdr->protocol == ntohs(ETH_P_IP) || grehdr->protocol == ntohs(ETH_P_IPV6)) {
         ip_offset = offset;
         goto iph_check;
-      } else if(grehdr->protocol ==  NDPI_GRE_PROTO_PPP) {  // ppp protocol
+      } else if(grehdr->protocol == NDPI_GRE_PROTO_PPP) {  // ppp protocol
         ip_offset = offset + NDPI_PPP_HDRLEN;
         goto iph_check;
       } else {
